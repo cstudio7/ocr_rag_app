@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Upload Legal PDFs</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    input[type="file"] { margin-top: 10px; }
+    button { padding: 10px 20px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+
+  <h1>📤 Upload Legal PDFs</h1>
+  <form id="uploadForm" enctype="multipart/form-data">
+    <input type="file" id="pdfFiles" name="pdfs" multiple accept="application/pdf">
+    <br>
+    <button type="submit">Upload and Index</button>
+  </form>
+
+  <div id="status"></div>
+
+  <script>
+    document.getElementById("uploadForm").addEventListener("submit", async function(e) {
+      e.preventDefault();
+      const files = document.getElementById("pdfFiles").files;
+      if (!files.length) return alert("Please select at least one PDF file.");
+
+      const formData = new FormData();
+      for (let file of files) {
+        formData.append("pdfs", file);
+      }
+
+      document.getElementById("status").innerText = "⏳ Uploading and indexing...";
+
+      const response = await fetch("http://localhost:5000/upload", {
+        method: "POST",
+        body: formData
+      });
+
+      const result = await response.json();
+      document.getElementById("status").innerText = result.message || JSON.stringify(result);
+    });
+  </script>
+
+</body>
+</html>
