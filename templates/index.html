@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Home - PDF Knowledge Base{% endblock %}
+
+{% block custom_css %}
+.hero {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    color: white;
+    padding: 4rem 0;
+    border-radius: 15px;
+    margin-bottom: 3rem;
+}
+
+.hero h1 {
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+}
+
+.hero p {
+    font-size: 1.2rem;
+    opacity: 0.9;
+}
+
+.feature-card {
+    height: 100%;
+    text-align: center;
+    padding: 2rem;
+}
+
+.feature-icon {
+    font-size: 3rem;
+    margin-bottom: 1.5rem;
+    color: var(--primary-color);
+}
+
+.cta-section {
+    background-color: #e9ecef;
+    padding: 3rem;
+    border-radius: 15px;
+    margin-top: 3rem;
+    text-align: center;
+}
+
+.btn-lg {
+    padding: 0.75rem 1.5rem;
+    font-size: 1.2rem;
+}
+{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<div class="hero text-center">
+    <h1><i class="fas fa-book-reader me-3"></i>PDF Knowledge Base</h1>
+    <p class="lead">Upload, index, and search your PDF documents with advanced semantic search capabilities</p>
+</div>
+
+<!-- Features Section -->
+<div class="row mb-5">
+    <div class="col-md-4 mb-4">
+        <div class="card feature-card">
+            <div class="feature-icon">
+                <i class="fas fa-file-upload"></i>
+            </div>
+            <h3>Upload & Index</h3>
+            <p>Upload your PDF documents and our system will automatically extract and index the content for efficient searching.</p>
+            <a href="/upload" class="btn btn-primary mt-3">Upload PDFs</a>
+        </div>
+    </div>
+    
+    <div class="col-md-4 mb-4">
+        <div class="card feature-card">
+            <div class="feature-icon">
+                <i class="fas fa-search"></i>
+            </div>
+            <h3>Semantic Search</h3>
+            <p>Use natural language to search through your documents. Our system understands the meaning behind your queries.</p>
+            <a href="/search" class="btn btn-primary mt-3">Search Documents</a>
+        </div>
+    </div>
+    
+    <div class="col-md-4 mb-4">
+        <div class="card feature-card">
+            <div class="feature-icon">
+                <i class="fas fa-brain"></i>
+            </div>
+            <h3>AI-Powered</h3>
+            <p>Leveraging state-of-the-art AI models to provide accurate and relevant search results from your documents.</p>
+            <a href="#" class="btn btn-primary mt-3">Learn More</a>
+        </div>
+    </div>
+</div>
+
+<!-- CTA Section -->
+<div class="cta-section">
+    <h2>Ready to get started?</h2>
+    <p class="lead">Upload your first PDF document and start searching through it in minutes.</p>
+    <div class="mt-4">
+        <a href="/upload" class="btn btn-primary btn-lg me-3">
+            <i class="fas fa-file-upload me-2"></i>Upload PDFs
+        </a>
+        <a href="/search" class="btn btn-outline-primary btn-lg">
+            <i class="fas fa-search me-2"></i>Search Documents
+        </a>
+    </div>
+</div>
+{% endblock %}

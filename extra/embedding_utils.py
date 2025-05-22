@@ -1,5 +1,4 @@
 from sentence_transformers import SentenceTransformer
-import textwrap
 
 # Load the embedding model once
 model = SentenceTransformer("all-MiniLM-L6-v2")
@@ -35,33 +34,53 @@ def chunk_text(text, max_length=500):
 
     return chunks
 
-def embed_chunks(page_texts, doc_id):
+def embed_chunks(page_texts, doc_id, batch_size=64):
     """
     Takes page-wise OCR output and returns embedded text chunks with metadata.
+    Uses batching for more efficient embedding.
 
     Args:
         page_texts (List[Dict]): [{'page_num': int, 'text': str}, ...]
         doc_id (str): Unique document identifier.
+        batch_size (int): Number of chunks to embed at once.
 
     Returns:
         List[Dict]: Embedded chunks with metadata.
     """
     results = []
+    all_chunks = []
+    chunk_metadata = []
 
+    # First, collect all chunks and their metadata
     for page in page_texts:
-        chunks = chunk_text(page['text'])
-        if not chunks:
+        page_chunks = chunk_text(page['text'])
+        if not page_chunks:
             continue
 
-        embeddings = model.encode(chunks)
-
-        for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
-            results.append({
-                'embedding': embedding,
-                'text': chunk,
+        for i, chunk in enumerate(page_chunks):
+            all_chunks.append(chunk)
+            chunk_metadata.append({
                 'doc_id': doc_id,
                 'page_num': page['page_num'],
                 'chunk_index': i
+            })
+
+    # Process in batches for efficiency
+    for i in range(0, len(all_chunks), batch_size):
+        batch_chunks = all_chunks[i:i+batch_size]
+        batch_metadata = chunk_metadata[i:i+batch_size]
+
+        # Encode the batch
+        batch_embeddings = model.encode(batch_chunks, show_progress_bar=False)
+
+        # Combine with metadata
+        for chunk, embedding, metadata in zip(batch_chunks, batch_embeddings, batch_metadata):
+            results.append({
+                'embedding': embedding,
+                'text': chunk,
+                'doc_id': metadata['doc_id'],
+                'page_num': metadata['page_num'],
+                'chunk_index': metadata['chunk_index']
             })
 
     return results

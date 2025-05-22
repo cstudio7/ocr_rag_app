@@ -1,0 +1,376 @@
+{% extends "base.html" %}
+
+{% block title %}Upload PDFs - PDF Knowledge Base{% endblock %}
+
+{% block custom_css %}
+.upload-container {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.upload-area {
+    border: 2px dashed #ccc;
+    border-radius: 10px;
+    padding: 3rem;
+    text-align: center;
+    background-color: #f8f9fa;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.upload-area:hover, .upload-area.dragover {
+    border-color: var(--primary-color);
+    background-color: rgba(67, 97, 238, 0.05);
+}
+
+.upload-icon {
+    font-size: 4rem;
+    color: var(--primary-color);
+    margin-bottom: 1rem;
+}
+
+.file-input {
+    display: none;
+}
+
+.selected-files {
+    margin-top: 1.5rem;
+    text-align: left;
+}
+
+.file-item {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem;
+    border-radius: 5px;
+    margin-bottom: 0.5rem;
+    background-color: #f8f9fa;
+}
+
+.file-icon {
+    font-size: 1.5rem;
+    margin-right: 1rem;
+    color: var(--primary-color);
+}
+
+.file-name {
+    flex-grow: 1;
+    font-weight: 500;
+}
+
+.file-size {
+    color: #6c757d;
+    margin-right: 1rem;
+}
+
+.remove-file {
+    color: #dc3545;
+    cursor: pointer;
+    font-size: 1.2rem;
+}
+
+.progress-container {
+    margin-top: 2rem;
+}
+
+.progress {
+    height: 1.5rem;
+    border-radius: 10px;
+}
+
+.log-container {
+    margin-top: 1.5rem;
+    max-height: 300px;
+    overflow-y: auto;
+    background-color: #212529;
+    color: #f8f9fa;
+    border-radius: 10px;
+    padding: 1rem;
+    font-family: monospace;
+}
+
+.log-entry {
+    margin-bottom: 0.5rem;
+    line-height: 1.5;
+}
+
+.upload-success {
+    background-color: #d1e7dd;
+    color: #0f5132;
+    padding: 1rem;
+    border-radius: 10px;
+    margin-top: 1.5rem;
+    text-align: center;
+}
+
+.upload-error {
+    background-color: #f8d7da;
+    color: #842029;
+    padding: 1rem;
+    border-radius: 10px;
+    margin-top: 1.5rem;
+    text-align: center;
+}
+{% endblock %}
+
+{% block content %}
+<div class="upload-container">
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="fas fa-file-upload me-2"></i>Upload PDF Documents
+        </div>
+        <div class="card-body">
+            <p class="card-text">
+                Upload your PDF documents to index them for semantic search. The system will extract text from each page,
+                generate embeddings, and store them in the vector database.
+            </p>
+
+            <form id="uploadForm">
+                <div class="upload-area" id="uploadArea">
+                    <i class="fas fa-cloud-upload-alt upload-icon"></i>
+                    <h3>Drag & Drop PDF Files Here</h3>
+                    <p>or</p>
+                    <button type="button" class="btn btn-primary" id="browseButton">
+                        <i class="fas fa-folder-open me-2"></i>Browse Files
+                    </button>
+                    <input type="file" name="pdfs" id="fileInput" class="file-input" multiple accept=".pdf">
+                </div>
+
+                <div class="selected-files" id="selectedFiles"></div>
+
+                <div class="text-center mt-4">
+                    <button type="submit" class="btn btn-primary btn-lg" id="uploadButton" disabled>
+                        <i class="fas fa-upload me-2"></i>Upload & Index
+                    </button>
+                </div>
+            </form>
+
+            <div class="progress-container d-none" id="progressContainer">
+                <h4>Indexing Progress</h4>
+                <div class="progress">
+                    <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated"
+                         role="progressbar" style="width: 0%">0%</div>
+                </div>
+                <div class="log-container mt-3" id="logContainer"></div>
+            </div>
+
+            <div class="upload-success d-none" id="successMessage">
+                <i class="fas fa-check-circle me-2"></i>
+                <span id="successText"></span>
+            </div>
+
+            <div class="upload-error d-none" id="errorMessage">
+                <i class="fas fa-exclamation-circle me-2"></i>
+                <span id="errorText"></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <i class="fas fa-info-circle me-2"></i>Tips for Better Results
+        </div>
+        <div class="card-body">
+            <ul class="mb-0">
+                <li>Make sure your PDFs are not password-protected</li>
+                <li>For best results, use PDFs with selectable text rather than scanned documents</li>
+                <li>Larger PDFs (over 100 pages) may take several minutes to process</li>
+                <li>The system will automatically handle duplicate uploads</li>
+                <li>You can upload multiple PDFs at once</li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const uploadForm = document.getElementById('uploadForm');
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const browseButton = document.getElementById('browseButton');
+        const selectedFiles = document.getElementById('selectedFiles');
+        const uploadButton = document.getElementById('uploadButton');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressBar = document.getElementById('progressBar');
+        const logContainer = document.getElementById('logContainer');
+        const successMessage = document.getElementById('successMessage');
+        const successText = document.getElementById('successText');
+        const errorMessage = document.getElementById('errorMessage');
+        const errorText = document.getElementById('errorText');
+
+        let files = [];
+
+        // Handle browse button click
+        browseButton.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        // Handle file selection
+        fileInput.addEventListener('change', (e) => {
+            const newFiles = Array.from(e.target.files).filter(file => file.type === 'application/pdf');
+            if (newFiles.length > 0) {
+                files = [...files, ...newFiles];
+                updateFileList();
+            }
+        });
+
+        // Handle drag and drop
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, () => {
+                uploadArea.classList.add('dragover');
+            });
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, () => {
+                uploadArea.classList.remove('dragover');
+            });
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            const newFiles = Array.from(e.dataTransfer.files).filter(file => file.type === 'application/pdf');
+            if (newFiles.length > 0) {
+                files = [...files, ...newFiles];
+                updateFileList();
+            }
+        });
+
+        // Update file list display
+        function updateFileList() {
+            selectedFiles.innerHTML = '';
+
+            files.forEach((file, index) => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+
+                const fileSize = formatFileSize(file.size);
+
+                fileItem.innerHTML = `
+                    <i class="fas fa-file-pdf file-icon"></i>
+                    <div class="file-name">${file.name}</div>
+                    <div class="file-size">${fileSize}</div>
+                    <i class="fas fa-times remove-file" data-index="${index}"></i>
+                `;
+
+                selectedFiles.appendChild(fileItem);
+            });
+
+            // Enable/disable upload button
+            uploadButton.disabled = files.length === 0;
+
+            // Add event listeners to remove buttons
+            document.querySelectorAll('.remove-file').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const index = parseInt(e.target.getAttribute('data-index'));
+                    files.splice(index, 1);
+                    updateFileList();
+                });
+            });
+        }
+
+        // Format file size
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' bytes';
+            else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+            else return (bytes / 1048576).toFixed(1) + ' MB';
+        }
+
+        // Handle form submission
+        uploadForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            if (files.length === 0) return;
+
+            // Reset UI
+            progressContainer.classList.remove('d-none');
+            successMessage.classList.add('d-none');
+            errorMessage.classList.add('d-none');
+            logContainer.innerHTML = '';
+            progressBar.style.width = '0%';
+            progressBar.textContent = '0%';
+
+            // Create FormData
+            const formData = new FormData();
+            files.forEach(file => {
+                formData.append('pdfs', file);
+            });
+
+            try {
+                // Upload files
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Upload failed');
+                }
+
+                // Get response data
+                const responseData = await response.json();
+
+                // Start listening for progress updates
+                const eventSource = new EventSource('/api/progress');
+
+                eventSource.onmessage = (event) => {
+                    const logEntry = document.createElement('div');
+                    logEntry.className = 'log-entry';
+                    logEntry.textContent = event.data;
+                    logContainer.appendChild(logEntry);
+                    logContainer.scrollTop = logContainer.scrollHeight;
+
+                    // Update progress bar
+                    const progress = Math.min(100, (logContainer.children.length / (files.length * 2)) * 100);
+                    progressBar.style.width = `${progress}%`;
+                    progressBar.textContent = `${Math.round(progress)}%`;
+
+                    if (progress >= 100) {
+                        eventSource.close();
+
+                        // Show success message
+                        successText.textContent = responseData.message;
+                        successMessage.classList.remove('d-none');
+
+                        // Reset file list
+                        files = [];
+                        updateFileList();
+                    }
+                };
+
+                eventSource.onerror = () => {
+                    eventSource.close();
+
+                    // If we have log entries, consider it a success
+                    if (logContainer.children.length > 0) {
+                        progressBar.style.width = '100%';
+                        progressBar.textContent = '100%';
+
+                        successText.textContent = responseData.message;
+                        successMessage.classList.remove('d-none');
+
+                        // Reset file list
+                        files = [];
+                        updateFileList();
+                    }
+                };
+            } catch (error) {
+                errorText.textContent = error.message;
+                errorMessage.classList.remove('d-none');
+                console.error('Upload error:', error);
+            }
+        });
+    });
+</script>
+{% endblock %}
