@@ -6,6 +6,7 @@
 .search-container {
     max-width: 900px;
     margin: 0 auto;
+    padding-bottom: 2rem;
 }
 
 .search-box {
@@ -116,97 +117,23 @@
     height: 3rem;
     color: var(--primary-color);
 }
-
-.document-stats {
-    background-color: white;
-    border-radius: 10px;
-    padding: 1.5rem;
-    margin-bottom: 2rem;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-    display: flex;
-    justify-content: space-around;
-    text-align: center;
-}
-
-.stat-item {
-    padding: 0 1rem;
-}
-
-.stat-value {
-    font-size: 2.5rem;
-    font-weight: 700;
-    color: var(--primary-color);
-    margin-bottom: 0.5rem;
-}
-
-.stat-label {
-    color: #6c757d;
-    font-size: 1rem;
-}
-
-.document-list {
-    margin-top: 2rem;
-}
-
-.document-item {
-    display: flex;
-    align-items: center;
-    background-color: white;
-    padding: 1rem;
-    border-radius: 10px;
-    margin-bottom: 1rem;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
-    transition: transform 0.3s ease;
-}
-
-.document-item:hover {
-    transform: translateX(5px);
-}
-
-.document-icon {
-    font-size: 1.5rem;
-    color: var(--primary-color);
-    margin-right: 1rem;
-}
-
-.document-name {
-    font-weight: 600;
-    flex-grow: 1;
-}
-
-.document-chunks {
-    background-color: var(--primary-color);
-    color: white;
-    padding: 0.3rem 0.8rem;
-    border-radius: 50px;
-    font-size: 0.9rem;
-}
 {% endblock %}
 
 {% block content %}
 <div class="search-container">
-    <!-- Document Stats -->
-    <div class="document-stats">
-        <div class="stat-item">
-            <div class="stat-value">{{ doc_count }}</div>
-            <div class="stat-label">Documents</div>
-        </div>
-        <div class="stat-item">
-            <div class="stat-value">{{ chunk_count }}</div>
-            <div class="stat-label">Text Chunks</div>
-        </div>
+    <!-- Search Header -->
+    <div class="text-center mb-4">
+        <h2><i class="fas fa-search me-2"></i>Search Your Documents</h2>
+        <p class="text-muted">Ask questions or search for specific information in your documents</p>
     </div>
 
     <!-- Search Box -->
     <div class="card mb-4">
         <div class="card-body">
-            <h3 class="card-title mb-4">
-                <i class="fas fa-search me-2"></i>Search Your Documents
-            </h3>
             <div class="search-box">
                 <i class="fas fa-search search-icon"></i>
                 <input type="text" id="searchInput" class="form-control search-input"
-                       placeholder="Enter your question or search terms...">
+                       placeholder="What would you like to know?">
                 <button id="searchButton" class="btn btn-primary search-button">
                     <i class="fas fa-search me-2"></i>Search
                 </button>
@@ -237,19 +164,6 @@
         <h3>No Results Found</h3>
         <p class="text-muted">Try different search terms or check if you have indexed documents.</p>
     </div>
-
-    <!-- Document List -->
-    <div class="document-list">
-        <h3 class="mb-3">Indexed Documents</h3>
-        <div id="documentList">
-            <div class="text-center py-4">
-                <div class="spinner-border" role="status" style="width: 1.5rem; height: 1.5rem;">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                <p class="mt-2">Loading documents...</p>
-            </div>
-        </div>
-    </div>
 </div>
 {% endblock %}
 
@@ -262,10 +176,6 @@
         const resultsContainer = document.getElementById('resultsContainer');
         const resultsList = document.getElementById('resultsList');
         const noResults = document.getElementById('noResults');
-        const documentList = document.getElementById('documentList');
-
-        // Load document list
-        loadDocuments();
 
         // Handle search
         searchButton.addEventListener('click', performSearch);
@@ -356,57 +266,7 @@
             });
         }
 
-        // Load document list
-        async function loadDocuments() {
-            try {
-                const response = await fetch('/api/documents');
 
-                if (!response.ok) {
-                    throw new Error('Failed to load documents');
-                }
-
-                const data = await response.json();
-
-                if (data.documents && data.documents.length > 0) {
-                    displayDocuments(data.documents);
-                } else {
-                    documentList.innerHTML = `
-                        <div class="text-center py-4">
-                            <i class="fas fa-file-alt mb-3" style="font-size: 2rem; color: #6c757d;"></i>
-                            <p>No documents indexed yet. Upload some PDFs first.</p>
-                            <a href="/upload" class="btn btn-primary mt-2">
-                                <i class="fas fa-file-upload me-2"></i>Upload PDFs
-                            </a>
-                        </div>
-                    `;
-                }
-            } catch (error) {
-                console.error('Error loading documents:', error);
-                documentList.innerHTML = `
-                    <div class="alert alert-danger">
-                        Failed to load document list. Please refresh the page.
-                    </div>
-                `;
-            }
-        }
-
-        // Display document list
-        function displayDocuments(documents) {
-            documentList.innerHTML = '';
-
-            documents.forEach(([docId, chunkCount]) => {
-                const docItem = document.createElement('div');
-                docItem.className = 'document-item';
-
-                docItem.innerHTML = `
-                    <i class="fas fa-file-pdf document-icon"></i>
-                    <div class="document-name">${docId}</div>
-                    <div class="document-chunks">${chunkCount} chunks</div>
-                `;
-
-                documentList.appendChild(docItem);
-            });
-        }
     });
 </script>
 {% endblock %}

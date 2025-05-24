@@ -7,15 +7,16 @@ from werkzeug.utils import secure_filename
 import os
 import time
 import logging
+import glob
 
 # Import configuration
 from config import (
     PDF_DIR, FLASK_DEBUG, MAX_CONTENT_LENGTH,
-    LOG_LEVEL, LOG_FORMAT, LOG_FILE
+    LOG_LEVEL, LOG_FORMAT, LOG_FILE, CACHE_DIR
 )
 
 # Import core functionality
-from core.indexer import index_pdf
+from core.indexer import index_pdf, get_chroma_collection
 from core.search import query_knowledge_base, get_document_stats, get_document_list
 
 # Configure logging
@@ -50,6 +51,11 @@ def upload_page():
 @app.route('/search')
 def search_page():
     """Page for searching indexed documents"""
+    return render_template('search.html')
+
+@app.route('/manage')
+def manage_page():
+    """Page for managing indexed documents"""
     # Get stats about indexed documents
     try:
         stats = get_document_stats()
@@ -60,7 +66,7 @@ def search_page():
         doc_count = 0
         chunk_count = 0
 
-    return render_template('search.html', doc_count=doc_count, chunk_count=chunk_count)
+    return render_template('manage.html', doc_count=doc_count, chunk_count=chunk_count)
 
 # API Routes
 @app.route("/api/upload", methods=["POST"])
@@ -133,6 +139,81 @@ def get_documents():
         return jsonify({"documents": doc_stats})
     except Exception as e:
         logging.error(f"Error getting document list: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/delete-document", methods=["POST"])
+def delete_document():
+    """API endpoint to delete a document from the vector store"""
+    try:
+        data = request.get_json()
+        doc_id = data.get("doc_id")
+
+        logging.info(f"Attempting to delete document: {doc_id}")
+
+        if not doc_id:
+            logging.warning("Delete request missing document ID")
+            return jsonify({"error": "Document ID is required"}), 400
+
+        # Get the ChromaDB collection
+        collection = get_chroma_collection()
+
+        # Check if document exists in collection
+        try:
+            doc_check = collection.get(where={"doc_id": doc_id})
+            if not doc_check or not doc_check.get('ids'):
+                logging.warning(f"Document {doc_id} not found in collection")
+                return jsonify({"error": f"Document {doc_id} not found in collection"}), 404
+
+            logging.info(f"Found {len(doc_check['ids'])} chunks for document {doc_id}")
+        except Exception as check_error:
+            logging.error(f"Error checking document existence: {check_error}")
+            return jsonify({"error": f"Error checking document: {str(check_error)}"}), 500
+
+        # Delete document from vector store
+        try:
+            # Get all IDs for this document
+            doc_chunks = collection.get(where={"doc_id": doc_id})
+            if doc_chunks and 'ids' in doc_chunks and doc_chunks['ids']:
+                # Delete by IDs instead of where clause
+                collection.delete(ids=doc_chunks['ids'])
+                logging.info(f"Deleted {len(doc_chunks['ids'])} chunks for document {doc_id} from vector store")
+            else:
+                logging.warning(f"No chunks found for document {doc_id}")
+        except Exception as delete_error:
+            logging.error(f"Error deleting from vector store: {delete_error}")
+            return jsonify({"error": f"Error deleting from vector store: {str(delete_error)}"}), 500
+
+        # Also delete the PDF file if it exists
+        try:
+            pdf_path = os.path.join(PDF_DIR, f"{doc_id}.pdf")
+            if os.path.exists(pdf_path):
+                os.remove(pdf_path)
+                logging.info(f"Deleted PDF file: {pdf_path}")
+            else:
+                logging.info(f"PDF file not found: {pdf_path}")
+        except Exception as file_error:
+            logging.error(f"Error deleting PDF file: {file_error}")
+            # Continue even if file deletion fails
+
+        # Delete any cache files for this document
+        try:
+            cache_pattern = os.path.join(CACHE_DIR, f"{doc_id}_*.pkl")
+            cache_files = glob.glob(cache_pattern)
+            for cache_file in cache_files:
+                os.remove(cache_file)
+                logging.info(f"Deleted cache file: {cache_file}")
+
+            if not cache_files:
+                logging.info(f"No cache files found for document {doc_id}")
+        except Exception as cache_error:
+            logging.error(f"Error deleting cache files: {cache_error}")
+            # Continue even if cache deletion fails
+
+        logging.info(f"Successfully deleted document: {doc_id}")
+        return jsonify({"success": True, "message": f"Document {doc_id} deleted successfully"})
+
+    except Exception as e:
+        logging.error(f"Error deleting document: {e}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
