@@ -20,7 +20,10 @@ from config import (
     VECTOR_STORE_DIR, CACHE_DIR, CHROMA_BATCH_SIZE, MAX_WORKERS,
     POPPLER_PATH, EMBEDDING_MODEL, COLLECTION_NAME
 )
-from core.extract import extract_text_by_page
+from core.extract import (
+    extract_text_by_page, convert_pdf_to_images,
+    process_ocr, chunk_text, generate_embeddings
+)
 from core.embedding import embed_chunks
 
 # Create necessary directories
@@ -228,7 +231,7 @@ def process_and_embed_pages(file_path, doc_id):
 
     return all_chunks
 
-def add_chunks_to_db(chunks, doc_id, batch_size=CHROMA_BATCH_SIZE):
+def add_chunks_to_db(chunks, doc_id, category="Uncategorized", batch_size=CHROMA_BATCH_SIZE, progress_callback=None):
     """
     Add chunks to ChromaDB in batches for better performance.
     Optimized with smaller batch sizes and incremental updates.
@@ -255,7 +258,8 @@ def add_chunks_to_db(chunks, doc_id, batch_size=CHROMA_BATCH_SIZE):
             include=["metadatas"]
         )
         if existing_ids and 'ids' in existing_ids and existing_ids['ids']:
-            logging.warning(f"Found {len(existing_ids['ids'])} existing chunks for {doc_id}")
+            if progress_callback:
+                progress_callback(f"Found {len(existing_ids['ids'])} existing chunks for {doc_id}")
             # Option to delete existing chunks
             # collection.delete(where={"doc_id": doc_id})
             # logging.info(f"Deleted existing chunks for {doc_id}")
@@ -282,20 +286,25 @@ def add_chunks_to_db(chunks, doc_id, batch_size=CHROMA_BATCH_SIZE):
             # Skip if this ID already exists
             if (existing_ids and 'ids' in existing_ids and
                 uid in existing_ids['ids']):
+                if progress_callback:
+                    progress_callback(f"Skipping batch {batch_num}/{total_batches} (already indexed)")
                 continue
 
             ids.append(uid)
             documents.append(chunk['text'])
             embeddings.append(chunk['embedding'])
+
             metadatas.append({
                 'doc_id': doc_id,
                 'page_num': chunk['page_num'],
-                'chunk_index': chunk['chunk_index']
+                'chunk_index': chunk['chunk_index'],
+                'category': category,
+                'upload_date': time.strftime('%Y-%m-%d'),
+                'last_updated': time.strftime('%Y-%m-%d')
             })
 
         # Skip empty batches
         if not ids:
-            logging.info(f"Skipping batch {batch_num}/{total_batches} (already indexed)")
             continue
 
         # Add batch to ChromaDB
@@ -306,15 +315,17 @@ def add_chunks_to_db(chunks, doc_id, batch_size=CHROMA_BATCH_SIZE):
                 ids=ids,
                 metadatas=metadatas
             )
-            logging.info(f"Added batch {batch_num}/{total_batches} to vector store ({len(ids)} chunks)")
+            if progress_callback:
+                progress_callback(f"Added batch {batch_num}/{total_batches} to vector store ({len(ids)} chunks)")
         except Exception as e:
             logging.error(f"Error adding batch {batch_num}: {e}")
 
         # Report progress percentage
         progress = min(100, (i + adjusted_batch_size) / total_chunks * 100)
-        logging.info(f"Database progress: {progress:.1f}%")
+        if progress_callback:
+            progress_callback(f"Database progress: {progress:.1f}%")
 
-def build_knowledge_base_optimized(file_path, doc_id):
+def build_knowledge_base_optimized(file_path, doc_id, category="Uncategorized"):
     """
     Optimized version of knowledge base building with:
     - Parallel OCR processing
@@ -331,28 +342,61 @@ def build_knowledge_base_optimized(file_path, doc_id):
         logging.error(f"No chunks generated for {doc_id}")
         return False
 
-    # Add chunks to vector database
-    add_chunks_to_db(chunks, doc_id)
+    # Add chunks to vector database with category
+    add_chunks_to_db(chunks, doc_id, category)
 
     end_time = time.time()
     logging.info(f"Finished indexing {doc_id} in {round(end_time - start_time, 2)} seconds")
     return True
 
-def index_pdf(file_path):
-    """
-    Main entry point for indexing a PDF file.
-    """
-    doc_id = os.path.splitext(os.path.basename(file_path))[0]
-    logging.info(f"Starting indexing for {doc_id}")
-
+def index_pdf(pdf_path, category="Uncategorized", progress_callback=None):
+    """Index a PDF document and store it in the vector database."""
     try:
-        success = build_knowledge_base_optimized(file_path, doc_id)
-        if success:
-            logging.info(f"Indexing completed for {doc_id}")
-            return doc_id
-        else:
-            logging.error(f"Failed to index {doc_id}")
-            return None
+        doc_id = os.path.splitext(os.path.basename(pdf_path))[0]
+        
+        if progress_callback:
+            progress_callback(f"Starting indexing for {doc_id}")
+        
+        # Convert PDF to images
+        if progress_callback:
+            progress_callback(f"Converting PDF to images: {pdf_path}")
+            
+        images = convert_pdf_to_images(pdf_path)
+        total_pages = len(images)
+        
+        if progress_callback:
+            progress_callback(f"PDF has {total_pages} pages")
+            progress_callback(f"PDF converted to {total_pages} images")
+        
+        # Process OCR in batches
+        text_chunks = []
+        for i, image in enumerate(images, 1):
+            if progress_callback:
+                progress_callback(f"OCR processing page {i}...")
+            
+            # Process OCR for this page
+            page_text = process_ocr(image)
+            text_chunks.extend(chunk_text(page_text, i))
+        
+        if progress_callback:
+            progress_callback(f"Generating embeddings for {total_pages} pages from {doc_id}")
+            
+        # Generate embeddings
+        chunks_with_embeddings = generate_embeddings(text_chunks)
+        
+        if progress_callback:
+            progress_callback(f"Adding {len(chunks_with_embeddings)} chunks to vector store for {doc_id}")
+            
+        # Add to vector store with progress updates
+        add_chunks_to_db(chunks_with_embeddings, doc_id, category, progress_callback=progress_callback)
+        
+        if progress_callback:
+            progress_callback(f"Finished indexing {doc_id}")
+            
+        return True
+        
     except Exception as e:
-        logging.error(f"Failed to index {doc_id}: {str(e)}")
-        return None
+        logging.error(f"Error indexing PDF {pdf_path}: {e}")
+        if progress_callback:
+            progress_callback(f"Error indexing PDF: {str(e)}")
+        return False

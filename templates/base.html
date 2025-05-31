@@ -109,26 +109,69 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="/">
-                            <i class="fas fa-home me-1"></i> Home
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/upload' %}active{% endif %}" href="/upload">
-                            <i class="fas fa-file-upload me-1"></i> Upload
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/search' %}active{% endif %}" href="/search">
-                            <i class="fas fa-search me-1"></i> Search
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/manage' %}active{% endif %}" href="/manage">
-                            <i class="fas fa-cog me-1"></i> Manage
-                        </a>
-                    </li>
+                    {% if current_user.is_authenticated %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="/">
+                                <i class="fas fa-home me-1"></i> Home
+                            </a>
+                        </li>
+                        {% if current_user.can_search() %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.path == '/search' %}active{% endif %}" href="/search">
+                                <i class="fas fa-search me-1"></i> Search
+                            </a>
+                        </li>
+                        {% endif %}
+                        {% if current_user.can_upload() %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.path == '/upload' %}active{% endif %}" href="/upload">
+                                <i class="fas fa-file-upload me-1"></i> Upload
+                            </a>
+                        </li>
+                        {% endif %}
+                        {% if current_user.can_manage %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.path == '/manage' %}active{% endif %}" href="/manage">
+                                <i class="fas fa-cog me-1"></i> Manage
+                            </a>
+                        </li>
+                        {% endif %}
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fas fa-user me-1"></i> {{ current_user.get_full_name() }}
+                                <span class="badge bg-secondary ms-1">{{ current_user.get_role_display() }}</span>
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
+                                <li><a class="dropdown-item" href="{{ url_for('profile') }}">
+                                    <i class="fas fa-user-edit me-2"></i>Profile
+                                </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('change_password') }}">
+                                    <i class="fas fa-key me-2"></i>Change Password
+                                </a></li>
+                                {% if current_user.can_manage %}
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{{ url_for('users_page') }}">
+                                    <i class="fas fa-users me-2"></i>User Management
+                                </a></li>
+                                {% endif %}
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{{ url_for('logout') }}">
+                                    <i class="fas fa-sign-out-alt me-2"></i>Logout
+                                </a></li>
+                            </ul>
+                        </li>
+                    {% else %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('login') }}">
+                                <i class="fas fa-sign-in-alt me-1"></i> Login
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('register') }}">
+                                <i class="fas fa-user-plus me-1"></i> Register
+                            </a>
+                        </li>
+                    {% endif %}
                 </ul>
             </div>
         </div>

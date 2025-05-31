@@ -117,6 +117,72 @@
     height: 3rem;
     color: var(--primary-color);
 }
+
+.alert-info {
+    background-color: #e7f3ff;
+    border-color: #b3d9ff;
+    color: #0c5460;
+}
+
+.alert-info .btn-outline-primary {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.alert-info .btn-outline-primary:hover {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.suggestions-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #ddd;
+    border-top: none;
+    border-radius: 0 0 10px 10px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.suggestion-item {
+    padding: 12px 16px;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+    transition: background-color 0.2s ease;
+    display: flex;
+    align-items: center;
+}
+
+.suggestion-item:last-child {
+    border-bottom: none;
+}
+
+.suggestion-item:hover,
+.suggestion-item.active {
+    background-color: #f8f9fa;
+}
+
+.suggestion-item .suggestion-icon {
+    color: #6c757d;
+    margin-right: 10px;
+    font-size: 0.9rem;
+}
+
+.suggestion-item .suggestion-text {
+    flex: 1;
+    font-size: 0.95rem;
+    color: #333;
+}
+
+.search-box {
+    position: relative;
+    z-index: 1001;
+}
 {% endblock %}
 
 {% block content %}
@@ -133,10 +199,12 @@
             <div class="search-box">
                 <i class="fas fa-search search-icon"></i>
                 <input type="text" id="searchInput" class="form-control search-input"
-                       placeholder="What would you like to know?">
+                       placeholder="What would you like to know?" autocomplete="off">
                 <button id="searchButton" class="btn btn-primary search-button">
                     <i class="fas fa-search me-2"></i>Search
                 </button>
+                <!-- Suggestions Dropdown -->
+                <div id="suggestionsDropdown" class="suggestions-dropdown d-none"></div>
             </div>
             <div class="form-text text-muted">
                 Try asking specific questions or searching for concepts rather than just keywords.
@@ -150,6 +218,19 @@
             <span class="visually-hidden">Loading...</span>
         </div>
         <p class="mt-3">Searching through documents...</p>
+    </div>
+
+    <!-- Spell Correction Notice -->
+    <div id="spellCorrectionNotice" class="alert alert-info d-none">
+        <div class="d-flex align-items-center justify-content-between">
+            <div>
+                <i class="fas fa-spell-check me-2"></i>
+                <strong>Auto-corrected:</strong> <span id="correctionText"></span>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-primary" id="searchOriginal">
+                <i class="fas fa-undo me-1"></i>Search original instead
+            </button>
+        </div>
     </div>
 
     <!-- Results Container -->
@@ -176,33 +257,104 @@
         const resultsContainer = document.getElementById('resultsContainer');
         const resultsList = document.getElementById('resultsList');
         const noResults = document.getElementById('noResults');
+        const spellCorrectionNotice = document.getElementById('spellCorrectionNotice');
+        const correctionText = document.getElementById('correctionText');
+        const searchOriginalBtn = document.getElementById('searchOriginal');
+        const suggestionsDropdown = document.getElementById('suggestionsDropdown');
+
+        let originalQuery = '';
+        let correctedQuery = '';
+        let currentSuggestionIndex = -1;
+        let suggestions = [];
+        let suggestionTimeout = null;
 
         // Handle search
         searchButton.addEventListener('click', performSearch);
         searchInput.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
-                performSearch();
+                e.preventDefault();
+                if (currentSuggestionIndex >= 0 && suggestions.length > 0) {
+                    // Select the highlighted suggestion
+                    selectSuggestion(suggestions[currentSuggestionIndex]);
+                } else {
+                    performSearch();
+                }
+            }
+        });
+
+        // Handle search original query
+        searchOriginalBtn.addEventListener('click', function() {
+            performSearch(true); // Pass true to search original query
+        });
+
+        // Handle input for suggestions
+        searchInput.addEventListener('input', function(e) {
+            const query = e.target.value.trim();
+
+            // Clear previous timeout
+            if (suggestionTimeout) {
+                clearTimeout(suggestionTimeout);
+            }
+
+            if (query.length >= 2) {
+                // Debounce the suggestions request
+                suggestionTimeout = setTimeout(() => {
+                    getSuggestions(query);
+                }, 300);
+            } else {
+                hideSuggestions();
+            }
+        });
+
+        // Handle keyboard navigation for suggestions
+        searchInput.addEventListener('keydown', function(e) {
+            if (suggestions.length === 0) return;
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                currentSuggestionIndex = Math.min(currentSuggestionIndex + 1, suggestions.length - 1);
+                highlightSuggestion();
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                currentSuggestionIndex = Math.max(currentSuggestionIndex - 1, -1);
+                highlightSuggestion();
+            } else if (e.key === 'Escape') {
+                hideSuggestions();
+            }
+        });
+
+        // Hide suggestions when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!searchInput.contains(e.target) && !suggestionsDropdown.contains(e.target)) {
+                hideSuggestions();
             }
         });
 
         // Perform search
-        async function performSearch() {
+        async function performSearch(useOriginal = false) {
             const query = searchInput.value.trim();
 
             if (!query) return;
 
-            // Show loading, hide results
+            // Show loading, hide results and spell correction notice
             loadingIndicator.classList.remove('d-none');
             resultsContainer.classList.add('d-none');
             noResults.classList.add('d-none');
+            spellCorrectionNotice.classList.add('d-none');
+            hideSuggestions();
 
             try {
+                const requestBody = { query };
+                if (useOriginal) {
+                    requestBody.use_original = true;
+                }
+
                 const response = await fetch('/api/query', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ query })
+                    body: JSON.stringify(requestBody)
                 });
 
                 if (!response.ok) {
@@ -213,6 +365,17 @@
 
                 // Hide loading
                 loadingIndicator.classList.add('d-none');
+
+                // Handle spell correction
+                if (data.has_corrections && !useOriginal) {
+                    originalQuery = data.query;
+                    correctedQuery = data.corrected_query;
+
+                    // Show spell correction notice
+                    const corrections = data.corrections.map(c => `"${c.original}" → "${c.corrected}"`).join(', ');
+                    correctionText.innerHTML = `${corrections}`;
+                    spellCorrectionNotice.classList.remove('d-none');
+                }
 
                 if (!data.results || data.results.length === 0) {
                     // Show no results
@@ -264,6 +427,89 @@
 
                 resultsList.appendChild(resultCard);
             });
+        }
+
+        // Get suggestions from the server
+        async function getSuggestions(query) {
+            try {
+                const response = await fetch('/api/suggestions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ query })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    suggestions = data.suggestions || [];
+                    displaySuggestions();
+                } else {
+                    hideSuggestions();
+                }
+            } catch (error) {
+                console.error('Error getting suggestions:', error);
+                hideSuggestions();
+            }
+        }
+
+        // Display suggestions dropdown
+        function displaySuggestions() {
+            if (suggestions.length === 0) {
+                hideSuggestions();
+                return;
+            }
+
+            suggestionsDropdown.innerHTML = '';
+            currentSuggestionIndex = -1;
+
+            suggestions.forEach((suggestion, index) => {
+                const suggestionItem = document.createElement('div');
+                suggestionItem.className = 'suggestion-item';
+                suggestionItem.innerHTML = `
+                    <i class="fas fa-search suggestion-icon"></i>
+                    <span class="suggestion-text">${suggestion}</span>
+                `;
+
+                suggestionItem.addEventListener('click', function() {
+                    selectSuggestion(suggestion);
+                });
+
+                suggestionItem.addEventListener('mouseenter', function() {
+                    currentSuggestionIndex = index;
+                    highlightSuggestion();
+                });
+
+                suggestionsDropdown.appendChild(suggestionItem);
+            });
+
+            suggestionsDropdown.classList.remove('d-none');
+        }
+
+        // Hide suggestions dropdown
+        function hideSuggestions() {
+            suggestionsDropdown.classList.add('d-none');
+            suggestions = [];
+            currentSuggestionIndex = -1;
+        }
+
+        // Highlight the current suggestion
+        function highlightSuggestion() {
+            const items = suggestionsDropdown.querySelectorAll('.suggestion-item');
+            items.forEach((item, index) => {
+                if (index === currentSuggestionIndex) {
+                    item.classList.add('active');
+                } else {
+                    item.classList.remove('active');
+                }
+            });
+        }
+
+        // Select a suggestion
+        function selectSuggestion(suggestion) {
+            searchInput.value = suggestion;
+            hideSuggestions();
+            performSearch();
         }
 
 

@@ -51,59 +51,142 @@
 <!-- Hero Section -->
 <div class="hero text-center">
     <h1><i class="fas fa-book-reader me-3"></i>PDF Knowledge Base</h1>
-    <p class="lead">Upload, index, and search your PDF documents with advanced semantic search capabilities</p>
+    {% if current_user.is_authenticated %}
+        <p class="lead">Welcome back, {{ current_user.get_full_name() }}!</p>
+        <p class="mb-0">Your role: <span class="badge bg-light text-dark">{{ current_user.get_role_display() }}</span></p>
+    {% else %}
+        <p class="lead">Upload, index, and search your PDF documents with advanced semantic search capabilities</p>
+    {% endif %}
 </div>
 
 <!-- Features Section -->
 <div class="row mb-5">
-    <div class="col-md-4 mb-4">
-        <div class="card feature-card">
-            <div class="feature-icon">
-                <i class="fas fa-file-upload"></i>
+    {% if current_user.is_authenticated %}
+        {% if current_user.can_search() %}
+        <div class="col-md-{% if current_user.can_upload() and current_user.can_manage() %}4{% elif current_user.can_upload() or current_user.can_manage() %}6{% else %}12{% endif %} mb-4">
+            <div class="card feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-search"></i>
+                </div>
+                <h3>Semantic Search</h3>
+                <p>Use natural language to search through your documents. Our system understands the meaning behind your queries.</p>
+                <a href="/search" class="btn btn-primary mt-3">Search Documents</a>
             </div>
-            <h3>Upload & Index</h3>
-            <p>Upload your PDF documents and our system will automatically extract and index the content for efficient searching.</p>
-            <a href="/upload" class="btn btn-primary mt-3">Upload PDFs</a>
         </div>
-    </div>
+        {% endif %}
 
-    <div class="col-md-4 mb-4">
-        <div class="card feature-card">
-            <div class="feature-icon">
-                <i class="fas fa-search"></i>
+        {% if current_user.can_upload() %}
+        <div class="col-md-{% if current_user.can_search() and current_user.can_manage() %}4{% elif current_user.can_search() or current_user.can_manage() %}6{% else %}12{% endif %} mb-4">
+            <div class="card feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-file-upload"></i>
+                </div>
+                <h3>Upload & Index</h3>
+                <p>Upload your PDF documents and our system will automatically extract and index the content for efficient searching.</p>
+                <a href="/upload" class="btn btn-primary mt-3">Upload PDFs</a>
             </div>
-            <h3>Semantic Search</h3>
-            <p>Use natural language to search through your documents. Our system understands the meaning behind your queries.</p>
-            <a href="/search" class="btn btn-primary mt-3">Search Documents</a>
         </div>
-    </div>
+        {% endif %}
 
-    <div class="col-md-4 mb-4">
-        <div class="card feature-card">
-            <div class="feature-icon">
-                <i class="fas fa-cog"></i>
+        {% if current_user.can_manage() %}
+        <div class="col-md-{% if current_user.can_search() and current_user.can_upload() %}4{% elif current_user.can_search() or current_user.can_upload() %}6{% else %}12{% endif %} mb-4">
+            <div class="card feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-cog"></i>
+                </div>
+                <h3>Manage Documents</h3>
+                <p>Easily manage your document collection. View all indexed documents and remove ones you no longer need.</p>
+                <a href="/manage" class="btn btn-primary mt-3">Manage Documents</a>
             </div>
-            <h3>Manage Documents</h3>
-            <p>Easily manage your document collection. View all indexed documents and remove ones you no longer need.</p>
-            <a href="/manage" class="btn btn-primary mt-3">Manage Documents</a>
         </div>
-    </div>
+        {% endif %}
+
+        {% if current_user.can_manage_users() %}
+        <div class="col-md-{% if (current_user.can_search() | int) + (current_user.can_upload() | int) + (current_user.can_manage() | int) == 3 %}3{% elif (current_user.can_search() | int) + (current_user.can_upload() | int) + (current_user.can_manage() | int) == 2 %}4{% elif (current_user.can_search() | int) + (current_user.can_upload() | int) + (current_user.can_manage() | int) == 1 %}6{% else %}12{% endif %} mb-4">
+            <div class="card feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-users"></i>
+                </div>
+                <h3>User Management</h3>
+                <p>Manage user accounts, roles, and permissions. Control who can access different features of the system.</p>
+                <a href="/users" class="btn btn-primary mt-3">Manage Users</a>
+            </div>
+        </div>
+        {% endif %}
+    {% else %}
+        <div class="col-md-4 mb-4">
+            <div class="card feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-file-upload"></i>
+                </div>
+                <h3>Upload & Index</h3>
+                <p>Upload your PDF documents and our system will automatically extract and index the content for efficient searching.</p>
+                <a href="/login" class="btn btn-primary mt-3">Login to Upload</a>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-4">
+            <div class="card feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-search"></i>
+                </div>
+                <h3>Semantic Search</h3>
+                <p>Use natural language to search through your documents. Our system understands the meaning behind your queries.</p>
+                <a href="/login" class="btn btn-primary mt-3">Login to Search</a>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-4">
+            <div class="card feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-cog"></i>
+                </div>
+                <h3>Manage Documents</h3>
+                <p>Easily manage your document collection. View all indexed documents and remove ones you no longer need.</p>
+                <a href="/login" class="btn btn-primary mt-3">Login to Manage</a>
+            </div>
+        </div>
+    {% endif %}
 </div>
 
 <!-- CTA Section -->
 <div class="cta-section">
-    <h2>Ready to get started?</h2>
-    <p class="lead">Upload your first PDF document and start searching through it in minutes.</p>
-    <div class="mt-4">
-        <a href="/upload" class="btn btn-primary btn-lg me-2">
-            <i class="fas fa-file-upload me-2"></i>Upload PDFs
-        </a>
-        <a href="/search" class="btn btn-outline-primary btn-lg me-2">
-            <i class="fas fa-search me-2"></i>Search Documents
-        </a>
-        <a href="/manage" class="btn btn-outline-secondary btn-lg">
-            <i class="fas fa-cog me-2"></i>Manage Documents
-        </a>
-    </div>
+    {% if current_user.is_authenticated %}
+        <h2>What would you like to do?</h2>
+        <p class="lead">Choose from the available actions based on your role permissions.</p>
+        <div class="mt-4">
+            {% if current_user.can_search() %}
+            <a href="/search" class="btn btn-primary btn-lg me-2">
+                <i class="fas fa-search me-2"></i>Search Documents
+            </a>
+            {% endif %}
+            {% if current_user.can_upload() %}
+            <a href="/upload" class="btn btn-outline-primary btn-lg me-2">
+                <i class="fas fa-file-upload me-2"></i>Upload PDFs
+            </a>
+            {% endif %}
+            {% if current_user.can_manage() %}
+            <a href="/manage" class="btn btn-outline-secondary btn-lg me-2">
+                <i class="fas fa-cog me-2"></i>Manage Documents
+            </a>
+            {% endif %}
+            {% if current_user.can_manage_users() %}
+            <a href="/users" class="btn btn-outline-warning btn-lg">
+                <i class="fas fa-users me-2"></i>Manage Users
+            </a>
+            {% endif %}
+        </div>
+    {% else %}
+        <h2>Ready to get started?</h2>
+        <p class="lead">Login to access the PDF knowledge base and start searching through documents.</p>
+        <div class="mt-4">
+            <a href="/login" class="btn btn-primary btn-lg me-2">
+                <i class="fas fa-sign-in-alt me-2"></i>Login
+            </a>
+            <a href="/register" class="btn btn-outline-primary btn-lg">
+                <i class="fas fa-user-plus me-2"></i>Register
+            </a>
+        </div>
+    {% endif %}
 </div>
 {% endblock %}

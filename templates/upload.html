@@ -138,6 +138,45 @@
 
                 <div class="selected-files" id="selectedFiles"></div>
 
+                <!-- Category Selection -->
+                <div class="category-section mt-4" id="categorySection" style="display: none;">
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="fas fa-tags me-2"></i>Categorize Documents
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label for="categorySelect" class="form-label">Select Category</label>
+                                    <select class="form-select" id="categorySelect">
+                                        <option value="Uncategorized">Uncategorized</option>
+                                        <option value="Research">Research</option>
+                                        <option value="Reports">Reports</option>
+                                        <option value="Documentation">Documentation</option>
+                                        <option value="Legal">Legal</option>
+                                        <option value="Financial">Financial</option>
+                                        <option value="Academic">Academic</option>
+                                        <option value="Technical">Technical</option>
+                                        <option value="Marketing">Marketing</option>
+                                        <option value="Training">Training</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="customCategory" class="form-label">Or Create New Category</label>
+                                    <input type="text" class="form-control" id="customCategory" placeholder="Enter custom category name">
+                                </div>
+                            </div>
+                            <div class="mt-3">
+                                <small class="text-muted">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    Categories help organize your documents and make them easier to find in the manage page.
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="text-center mt-4">
                     <button type="submit" class="btn btn-primary btn-lg" id="uploadButton" disabled>
                         <i class="fas fa-upload me-2"></i>Upload & Index
@@ -199,6 +238,9 @@
         const successText = document.getElementById('successText');
         const errorMessage = document.getElementById('errorMessage');
         const errorText = document.getElementById('errorText');
+        const categorySection = document.getElementById('categorySection');
+        const categorySelect = document.getElementById('categorySelect');
+        const customCategory = document.getElementById('customCategory');
 
         let files = [];
 
@@ -269,6 +311,13 @@
             // Enable/disable upload button
             uploadButton.disabled = files.length === 0;
 
+            // Show/hide category section
+            if (files.length > 0) {
+                categorySection.style.display = 'block';
+            } else {
+                categorySection.style.display = 'none';
+            }
+
             // Add event listeners to remove buttons
             document.querySelectorAll('.remove-file').forEach(button => {
                 button.addEventListener('click', (e) => {
@@ -300,11 +349,15 @@
             progressBar.style.width = '0%';
             progressBar.textContent = '0%';
 
+            // Get selected category
+            const selectedCategory = customCategory.value.trim() || categorySelect.value;
+
             // Create FormData
             const formData = new FormData();
             files.forEach(file => {
                 formData.append('pdfs', file);
             });
+            formData.append('category', selectedCategory);
 
             try {
                 // Upload files
@@ -331,12 +384,37 @@
                     logContainer.appendChild(logEntry);
                     logContainer.scrollTop = logContainer.scrollHeight;
 
-                    // Update progress bar
-                    const progress = Math.min(100, (logContainer.children.length / (files.length * 2)) * 100);
-                    progressBar.style.width = `${progress}%`;
-                    progressBar.textContent = `${Math.round(progress)}%`;
-
-                    if (progress >= 100) {
+                    // Update progress bar based on different progress indicators
+                    if (event.data.includes("Database progress:")) {
+                        const progressMatch = event.data.match(/Database progress: (\d+\.?\d*)%/);
+                        if (progressMatch) {
+                            const progress = Math.min(100, parseFloat(progressMatch[1]));
+                            progressBar.style.width = `${progress}%`;
+                            progressBar.textContent = `${Math.round(progress)}%`;
+                        }
+                    } else if (event.data.includes("Converting PDF to images:")) {
+                        progressBar.style.width = "10%";
+                        progressBar.textContent = "10% - Converting PDF";
+                    } else if (event.data.includes("PDF converted to")) {
+                        progressBar.style.width = "20%";
+                        progressBar.textContent = "20% - Starting OCR";
+                    } else if (event.data.includes("OCR processing page")) {
+                        const pageMatch = event.data.match(/OCR processing page (\d+)/);
+                        if (pageMatch && files.length === 1) {
+                            const currentPage = parseInt(pageMatch[1]);
+                            const progress = Math.min(60, 20 + (currentPage / totalPages) * 40);
+                            progressBar.style.width = `${progress}%`;
+                            progressBar.textContent = `${Math.round(progress)}% - OCR Processing`;
+                        }
+                    } else if (event.data.includes("Generating embeddings")) {
+                        progressBar.style.width = "70%";
+                        progressBar.textContent = "70% - Generating Embeddings";
+                    } else if (event.data.includes("Adding") && event.data.includes("chunks to vector store")) {
+                        progressBar.style.width = "80%";
+                        progressBar.textContent = "80% - Adding to Database";
+                    } else if (event.data.includes("Finished indexing")) {
+                        progressBar.style.width = "100%";
+                        progressBar.textContent = "100% - Complete";
                         eventSource.close();
 
                         // Show success message
@@ -348,6 +426,17 @@
                         updateFileList();
                     }
                 };
+
+                // Track total pages for progress calculation
+                let totalPages = 0;
+                eventSource.addEventListener('message', (event) => {
+                    if (event.data.includes("PDF has")) {
+                        const pagesMatch = event.data.match(/PDF has (\d+) pages/);
+                        if (pagesMatch) {
+                            totalPages = parseInt(pagesMatch[1]);
+                        }
+                    }
+                });
 
                 eventSource.onerror = () => {
                     eventSource.close();

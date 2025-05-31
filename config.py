@@ -4,6 +4,7 @@ Configuration settings for the PDF Knowledge Base application.
 import os
 import logging
 from pathlib import Path
+from datetime import timedelta
 
 # Base directories
 BASE_DIR = Path(__file__).resolve().parent
@@ -29,6 +30,25 @@ os.makedirs(CACHE_DIR, exist_ok=True)
 # Flask configuration
 FLASK_DEBUG = True
 MAX_CONTENT_LENGTH = 100 * 1024 * 1024  # 100MB max upload size
+
+# Security settings
+SECRET_KEY = os.environ.get('SECRET_KEY') or 'your-secret-key-change-this-in-production'
+WTF_CSRF_ENABLED = True
+WTF_CSRF_TIME_LIMIT = None
+
+# Database settings
+DATABASE_URL = os.environ.get('DATABASE_URL') or f'sqlite:///{os.path.join(DATA_DIR, "app.db")}'
+SQLALCHEMY_DATABASE_URI = DATABASE_URL
+SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+# Session settings
+PERMANENT_SESSION_LIFETIME = timedelta(days=7)  # Remember me duration
+SESSION_COOKIE_SECURE = False  # Set to True in production with HTTPS
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+
+# Authentication settings
+LOGIN_DISABLED = False  # Set to True to disable authentication (for development)
 
 # Embedding model configuration
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"

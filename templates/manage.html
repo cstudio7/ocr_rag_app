@@ -4,7 +4,7 @@
 
 {% block custom_css %}
 .document-container {
-    max-width: 900px;
+    max-width: 1200px;
     margin: 0 auto;
 }
 
@@ -12,87 +12,276 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 1.5rem;
+    margin-bottom: 2rem;
 }
 
-.document-stats {
-    background-color: white;
-    border-radius: 10px;
+.document-header h3 {
+    color: #2d3748;
+    font-weight: 700;
+    margin: 0;
+}
+
+.search-filter-section {
+    background: white;
+    border-radius: 15px;
     padding: 1.5rem;
     margin-bottom: 2rem;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+
+.filter-row {
     display: flex;
-    justify-content: space-around;
+    gap: 1rem;
+    align-items: end;
+    flex-wrap: wrap;
+}
+
+.filter-group {
+    flex: 1;
+    min-width: 200px;
+}
+
+.filter-label {
+    font-weight: 600;
+    color: #4a5568;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.filter-input {
+    border-radius: 10px;
+    border: 2px solid #e2e8f0;
+    padding: 0.75rem 1rem;
+    transition: all 0.3s ease;
+    width: 100%;
+}
+
+.filter-input:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.2rem rgba(67, 97, 238, 0.25);
+    outline: none;
+}
+
+.btn-filter {
+    padding: 0.75rem 1.5rem;
+    border-radius: 10px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.categories-section {
+    background: white;
+    border-radius: 15px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+
+.folder-tree {
+    background: #f8fafc;
+    border-radius: 10px;
+    padding: 1rem;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.folder-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: white;
+    border: 1px solid #e2e8f0;
+    position: relative;
+}
+
+.folder-item:hover {
+    background: #f1f5f9;
+    border-color: var(--primary-color);
+    transform: translateX(5px);
+}
+
+.folder-item.active {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
+.folder-item.active:hover {
+    background: #5a67d8;
+}
+
+.folder-count {
+    background: rgba(0, 0, 0, 0.1);
+    color: #4a5568;
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    min-width: 24px;
     text-align: center;
 }
 
-.stat-item {
-    padding: 0 1rem;
+.folder-item.active .folder-count {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
 }
 
-.stat-value {
-    font-size: 2.5rem;
-    font-weight: 700;
-    color: var(--primary-color);
-    margin-bottom: 0.5rem;
+.folder-actions {
+    display: none;
+    gap: 0.25rem;
+    margin-left: 0.5rem;
 }
 
-.stat-label {
-    color: #6c757d;
-    font-size: 1rem;
+.folder-item:hover .folder-actions {
+    display: flex;
+}
+
+.folder-action-btn {
+    width: 24px;
+    height: 24px;
+    border: none;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: all 0.2s ease;
+}
+
+.folder-action-btn:hover {
+    transform: scale(1.1);
+}
+
+.btn-edit-folder {
+    background: rgba(245, 158, 11, 0.2);
+    color: #f59e0b;
+}
+
+.btn-delete-folder {
+    background: rgba(220, 53, 69, 0.2);
+    color: #dc3545;
+}
+
+.folder-item.active .folder-action-btn {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+.document-folder-badge {
+    background: linear-gradient(135deg, #10b981, #34d399);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 15px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
 }
 
 .document-item {
     display: flex;
     align-items: center;
     background-color: white;
-    padding: 1rem;
-    border-radius: 10px;
+    padding: 1.5rem;
+    border-radius: 15px;
     margin-bottom: 1rem;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
-    transition: transform 0.3s ease;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
+    border: 1px solid #f1f5f9;
 }
 
 .document-item:hover {
-    transform: translateX(5px);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
 }
 
 .document-icon {
-    font-size: 1.5rem;
+    font-size: 2rem;
     color: var(--primary-color);
-    margin-right: 1rem;
+    margin-right: 1.5rem;
+    background: rgba(67, 97, 238, 0.1);
+    padding: 0.75rem;
+    border-radius: 12px;
 }
 
-.document-name {
-    font-weight: 600;
+.document-info {
     flex-grow: 1;
 }
 
-.document-chunks {
-    background-color: var(--primary-color);
-    color: white;
-    padding: 0.3rem 0.8rem;
-    border-radius: 50px;
+.document-name {
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: #2d3748;
+    margin-bottom: 0.5rem;
+}
+
+.document-meta {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.meta-item {
+    display: flex;
+    align-items: center;
+    color: #718096;
     font-size: 0.9rem;
-    margin-right: 1rem;
+}
+
+.meta-item i {
+    margin-right: 0.5rem;
+    color: var(--primary-color);
+}
+
+.document-category {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 15px;
+    font-size: 0.8rem;
+    font-weight: 600;
 }
 
 .document-actions {
     display: flex;
     gap: 0.5rem;
+    align-items: center;
+}
+
+.btn-action {
+    border: none;
+    border-radius: 10px;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    font-size: 1rem;
+}
+
+.btn-reindex {
+    color: #f59e0b;
+    background-color: rgba(245, 158, 11, 0.1);
+}
+
+.btn-reindex:hover {
+    background-color: rgba(245, 158, 11, 0.2);
+    transform: scale(1.1);
 }
 
 .btn-delete {
     color: #dc3545;
     background-color: rgba(220, 53, 69, 0.1);
-    border: none;
-    border-radius: 50%;
-    width: 36px;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.3s ease;
 }
 
 .btn-delete:hover {
@@ -182,26 +371,70 @@
 
 {% block content %}
 <div class="document-container">
-    <!-- Document Stats -->
-    <div class="document-stats">
-        <div class="stat-item">
-            <div class="stat-value">{{ doc_count }}</div>
-            <div class="stat-label">Documents</div>
-        </div>
-        <div class="stat-item">
-            <div class="stat-value">{{ chunk_count }}</div>
-            <div class="stat-label">Text Chunks</div>
-        </div>
-    </div>
-
     <!-- Document Header -->
     <div class="document-header">
         <h3>
-            <i class="fas fa-file-pdf me-2"></i>Manage Documents
+            <i class="fas fa-folder-open me-2"></i>Document Library
         </h3>
         <a href="/upload" class="btn btn-primary">
             <i class="fas fa-file-upload me-2"></i>Upload New PDF
         </a>
+    </div>
+
+    <!-- Search & Filter Section -->
+    <div class="search-filter-section">
+        <h5 class="mb-3"><i class="fas fa-filter me-2"></i>Search & Filter</h5>
+        <div class="filter-row">
+            <div class="filter-group">
+                <label class="filter-label">Document Name</label>
+                <input type="text" id="nameFilter" class="filter-input" placeholder="Search by document name...">
+            </div>
+            <div class="filter-group">
+                <label class="filter-label">Upload Date</label>
+                <select id="dateFilter" class="filter-input">
+                    <option value="">All dates</option>
+                    <option value="today">Today</option>
+                    <option value="week">This week</option>
+                    <option value="month">This month</option>
+                    <option value="older">Older</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label class="filter-label">Sort By</label>
+                <select id="sortFilter" class="filter-input">
+                    <option value="date_desc">Newest first</option>
+                    <option value="date_asc">Oldest first</option>
+                    <option value="name_asc">Name A-Z</option>
+                    <option value="name_desc">Name Z-A</option>
+                </select>
+            </div>
+            <div class="filter-group" style="flex: 0;">
+                <button id="clearFilters" class="btn btn-outline-secondary btn-filter">
+                    <i class="fas fa-times me-1"></i>Clear
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Folders Section -->
+    <div class="categories-section">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="mb-0"><i class="fas fa-folder me-2"></i>Folders</h5>
+            <button class="btn btn-outline-primary btn-sm" id="createFolderBtn">
+                <i class="fas fa-folder-plus me-1"></i>New Folder
+            </button>
+        </div>
+        <div class="folder-tree" id="folderTree">
+            <div class="folder-item active" data-folder="all">
+                <i class="fas fa-home me-2"></i>All Documents
+                <span class="folder-count" id="allDocsCount">0</span>
+            </div>
+            <div class="folder-item" data-folder="uncategorized">
+                <i class="fas fa-folder me-2"></i>Uncategorized
+                <span class="folder-count" id="uncategorizedCount">0</span>
+            </div>
+            <!-- Dynamic folders will be added here -->
+        </div>
     </div>
 
     <!-- Loading Indicator -->
@@ -247,24 +480,143 @@
         </div>
     </div>
 </div>
+
+<!-- Re-index Confirmation Modal -->
+<div class="modal fade" id="reindexModal" tabindex="-1" aria-labelledby="reindexModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="icon-box" style="background: #f59e0b;">
+                    <i class="fas fa-sync-alt"></i>
+                </div>
+                <h4 class="modal-title" id="reindexModalLabel">Re-index Document?</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Do you want to re-index <strong id="reindexDocName"></strong>? This will refresh the document's search index and may fix any corruption issues.</p>
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    This process may take a few moments depending on the document size.
+                </div>
+            </div>
+            <div class="modal-footer justify-content-center">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" id="confirmReindex">
+                    <i class="fas fa-sync-alt me-2"></i>Re-index
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Folder Modal -->
+<div class="modal fade" id="createFolderModal" tabindex="-1" aria-labelledby="createFolderModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="icon-box" style="background: #10b981;">
+                    <i class="fas fa-folder-plus"></i>
+                </div>
+                <h4 class="modal-title" id="createFolderModalLabel">Create New Folder</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createFolderForm">
+                    <div class="mb-3">
+                        <label for="folderName" class="form-label">Folder Name</label>
+                        <input type="text" class="form-control" id="folderName" placeholder="Enter folder name" required>
+                        <div class="form-text">Choose a descriptive name for your folder</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="folderDescription" class="form-label">Description (Optional)</label>
+                        <textarea class="form-control" id="folderDescription" rows="2" placeholder="Brief description of what this folder contains"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="confirmCreateFolder">
+                    <i class="fas fa-folder-plus me-2"></i>Create Folder
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Move Document Modal -->
+<div class="modal fade" id="moveDocumentModal" tabindex="-1" aria-labelledby="moveDocumentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="icon-box" style="background: #3b82f6;">
+                    <i class="fas fa-arrows-alt"></i>
+                </div>
+                <h4 class="modal-title" id="moveDocumentModalLabel">Move Document</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Move <strong id="moveDocName"></strong> to:</p>
+                <div class="folder-selection" id="folderSelection">
+                    <!-- Folder options will be populated here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirmMoveDocument">
+                    <i class="fas fa-arrows-alt me-2"></i>Move Document
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // DOM elements
         const loadingIndicator = document.getElementById('loadingIndicator');
         const documentList = document.getElementById('documentList');
         const emptyState = document.getElementById('emptyState');
         const deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+        const reindexModal = new bootstrap.Modal(document.getElementById('reindexModal'));
+        const createFolderModal = new bootstrap.Modal(document.getElementById('createFolderModal'));
+        const moveDocumentModal = new bootstrap.Modal(document.getElementById('moveDocumentModal'));
         const deleteDocName = document.getElementById('deleteDocName');
+        const reindexDocName = document.getElementById('reindexDocName');
         const confirmDeleteBtn = document.getElementById('confirmDelete');
+        const confirmReindexBtn = document.getElementById('confirmReindex');
+        const createFolderBtn = document.getElementById('createFolderBtn');
+        const confirmCreateFolderBtn = document.getElementById('confirmCreateFolder');
+        const confirmMoveDocumentBtn = document.getElementById('confirmMoveDocument');
 
+        // Filter elements
+        const nameFilter = document.getElementById('nameFilter');
+        const dateFilter = document.getElementById('dateFilter');
+        const sortFilter = document.getElementById('sortFilter');
+        const clearFiltersBtn = document.getElementById('clearFilters');
+        const categoryTabs = document.getElementById('categoryTabs');
+
+        // State
+        let allDocuments = [];
+        let filteredDocuments = [];
         let currentDocId = null;
+        let folders = ['all', 'uncategorized'];
+        let currentFolder = 'all';
 
-        // Load documents
+        // Load documents on page load
         loadDocuments();
 
-        // Load document list
+        // Event listeners
+        nameFilter.addEventListener('input', debounce(applyFilters, 300));
+        dateFilter.addEventListener('change', applyFilters);
+        sortFilter.addEventListener('change', applyFilters);
+        clearFiltersBtn.addEventListener('click', clearFilters);
+        createFolderBtn.addEventListener('click', () => createFolderModal.show());
+        confirmCreateFolderBtn.addEventListener('click', createFolder);
+        confirmMoveDocumentBtn.addEventListener('click', moveDocument);
+
+        // Load document list from API
         async function loadDocuments() {
             try {
                 const response = await fetch('/api/documents');
@@ -279,7 +631,10 @@
                 loadingIndicator.classList.add('d-none');
 
                 if (data.documents && data.documents.length > 0) {
-                    displayDocuments(data.documents);
+                    allDocuments = data.documents;
+                    loadFolders();
+                    renderFolders();
+                    applyFilters();
                     documentList.classList.remove('d-none');
                 } else {
                     emptyState.classList.remove('d-none');
@@ -289,6 +644,7 @@
                 loadingIndicator.classList.add('d-none');
                 documentList.innerHTML = `
                     <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
                         Failed to load document list. Please refresh the page.
                     </div>
                 `;
@@ -296,20 +652,180 @@
             }
         }
 
-        // Display document list
+        // Extract unique categories from documents
+        function extractCategories() {
+            categories.clear();
+            categories.add('all');
+
+            allDocuments.forEach(doc => {
+                if (doc.category && doc.category !== 'Uncategorized') {
+                    categories.add(doc.category);
+                }
+            });
+        }
+
+        // Render category tabs
+        function renderCategories() {
+            const allTab = categoryTabs.querySelector('[data-category="all"]');
+            categoryTabs.innerHTML = '';
+            categoryTabs.appendChild(allTab);
+
+            categories.forEach(category => {
+                if (category !== 'all') {
+                    const tab = document.createElement('div');
+                    tab.className = 'category-tab';
+                    tab.setAttribute('data-category', category);
+                    tab.innerHTML = `<i class="fas fa-tag me-1"></i>${category}`;
+                    tab.addEventListener('click', () => selectCategory(category));
+                    categoryTabs.appendChild(tab);
+                }
+            });
+
+            // Add event listener to "All" tab
+            allTab.addEventListener('click', () => selectCategory('all'));
+        }
+
+        // Select category
+        function selectCategory(category) {
+            // Update active tab
+            categoryTabs.querySelectorAll('.category-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            categoryTabs.querySelector(`[data-category="${category}"]`).classList.add('active');
+
+            // Apply filters
+            applyFilters();
+        }
+
+        // Apply all filters
+        function applyFilters() {
+            const nameQuery = nameFilter.value.toLowerCase().trim();
+            const dateFilter_value = dateFilter.value;
+            const sortBy = sortFilter.value;
+
+            // Filter documents
+            filteredDocuments = allDocuments.filter(doc => {
+                // Name filter
+                if (nameQuery && !doc.doc_id.toLowerCase().includes(nameQuery)) {
+                    return false;
+                }
+
+                // Folder filter
+                if (currentFolder !== 'all') {
+                    const docFolder = doc.folder || 'uncategorized';
+                    if (docFolder !== currentFolder) {
+                        return false;
+                    }
+                }
+
+                // Date filter
+                if (dateFilter_value && doc.upload_date) {
+                    const uploadDate = new Date(doc.upload_date);
+                    const now = new Date();
+                    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                    const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+                    const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+                    switch (dateFilter_value) {
+                        case 'today':
+                            if (uploadDate < today) return false;
+                            break;
+                        case 'week':
+                            if (uploadDate < weekAgo) return false;
+                            break;
+                        case 'month':
+                            if (uploadDate < monthAgo) return false;
+                            break;
+                        case 'older':
+                            if (uploadDate >= monthAgo) return false;
+                            break;
+                    }
+                }
+
+                return true;
+            });
+
+            // Sort documents
+            filteredDocuments.sort((a, b) => {
+                switch (sortBy) {
+                    case 'date_desc':
+                        return new Date(b.upload_date || 0) - new Date(a.upload_date || 0);
+                    case 'date_asc':
+                        return new Date(a.upload_date || 0) - new Date(b.upload_date || 0);
+                    case 'name_asc':
+                        return a.doc_id.localeCompare(b.doc_id);
+                    case 'name_desc':
+                        return b.doc_id.localeCompare(a.doc_id);
+                    default:
+                        return 0;
+                }
+            });
+
+            displayDocuments(filteredDocuments);
+        }
+
+        // Clear all filters
+        function clearFilters() {
+            nameFilter.value = '';
+            dateFilter.value = '';
+            sortFilter.value = 'date_desc';
+            selectFolder('all');
+        }
+
+        // Display filtered documents
         function displayDocuments(documents) {
             documentList.innerHTML = '';
 
-            documents.forEach(([docId, chunkCount]) => {
+            if (documents.length === 0) {
+                documentList.innerHTML = `
+                    <div class="alert alert-info text-center">
+                        <i class="fas fa-search me-2"></i>
+                        No documents match your current filters.
+                    </div>
+                `;
+                return;
+            }
+
+            documents.forEach(doc => {
                 const docItem = document.createElement('div');
                 docItem.className = 'document-item';
 
+                const uploadDate = doc.upload_date ? new Date(doc.upload_date).toLocaleDateString() : 'Unknown';
+                const lastUpdated = doc.last_updated ? new Date(doc.last_updated).toLocaleDateString() : uploadDate;
+
                 docItem.innerHTML = `
                     <i class="fas fa-file-pdf document-icon"></i>
-                    <div class="document-name">${docId}</div>
-                    <div class="document-chunks">${chunkCount} chunks</div>
+                    <div class="document-info">
+                        <div class="document-name">${doc.doc_id}</div>
+                        <div class="document-meta">
+                            <div class="meta-item">
+                                <i class="fas fa-calendar-alt"></i>
+                                Uploaded: ${uploadDate}
+                            </div>
+                            <div class="meta-item">
+                                <i class="fas fa-clock"></i>
+                                Updated: ${lastUpdated}
+                            </div>
+                            ${doc.page_count ? `
+                                <div class="meta-item">
+                                    <i class="fas fa-file-alt"></i>
+                                    ${doc.page_count} pages
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                    <div class="document-folder-badge">
+                        <i class="fas fa-folder"></i>
+                        ${doc.folder || 'Uncategorized'}
+                    </div>
                     <div class="document-actions">
-                        <button class="btn-delete" data-doc-id="${docId}" title="Delete document">
+                        <button class="btn-action btn-move" data-doc-id="${doc.doc_id}" title="Move to folder" style="color: #3b82f6; background-color: rgba(59, 130, 246, 0.1);">
+                            <i class="fas fa-arrows-alt"></i>
+                        </button>
+                        <button class="btn-action btn-reindex" data-doc-id="${doc.doc_id}" title="Re-index document">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                        <button class="btn-action btn-delete" data-doc-id="${doc.doc_id}" title="Delete document">
                             <i class="fas fa-trash-alt"></i>
                         </button>
                     </div>
@@ -317,13 +833,33 @@
 
                 documentList.appendChild(docItem);
 
-                // Add event listener to delete button
+                // Add event listeners
+                const moveBtn = docItem.querySelector('.btn-move');
+                const reindexBtn = docItem.querySelector('.btn-reindex');
                 const deleteBtn = docItem.querySelector('.btn-delete');
+
+                moveBtn.addEventListener('click', function() {
+                    const docId = this.getAttribute('data-doc-id');
+                    showMoveDocumentModal(docId);
+                });
+
+                reindexBtn.addEventListener('click', function() {
+                    const docId = this.getAttribute('data-doc-id');
+                    showReindexConfirmation(docId);
+                });
+
                 deleteBtn.addEventListener('click', function() {
                     const docId = this.getAttribute('data-doc-id');
                     showDeleteConfirmation(docId);
                 });
             });
+        }
+
+        // Show re-index confirmation modal
+        function showReindexConfirmation(docId) {
+            currentDocId = docId;
+            reindexDocName.textContent = docId;
+            reindexModal.show();
         }
 
         // Show delete confirmation modal
@@ -333,11 +869,51 @@
             deleteModal.show();
         }
 
+        // Handle re-index confirmation
+        confirmReindexBtn.addEventListener('click', async function() {
+            if (!currentDocId) return;
+
+            // Disable button and show loading state
+            confirmReindexBtn.disabled = true;
+            confirmReindexBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Re-indexing...';
+
+            try {
+                const response = await fetch('/api/reindex-document', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ doc_id: currentDocId })
+                });
+
+                const data = await response.json();
+                reindexModal.hide();
+
+                if (!response.ok) {
+                    showAlert('danger', `Error: ${data.error || 'Failed to re-index document'}`);
+                } else {
+                    showAlert('success', `Document "${currentDocId}" has been successfully re-indexed.`);
+                    // Reload documents to get updated information
+                    loadingIndicator.classList.remove('d-none');
+                    documentList.classList.add('d-none');
+                    loadDocuments();
+                }
+
+                currentDocId = null;
+            } catch (error) {
+                console.error('Error re-indexing document:', error);
+                reindexModal.hide();
+                showAlert('danger', `Failed to re-index document: ${error.message}`);
+            } finally {
+                confirmReindexBtn.disabled = false;
+                confirmReindexBtn.innerHTML = '<i class="fas fa-sync-alt me-2"></i>Re-index';
+            }
+        });
+
         // Handle delete confirmation
         confirmDeleteBtn.addEventListener('click', async function() {
             if (!currentDocId) return;
 
-            // Disable button and show loading state
             confirmDeleteBtn.disabled = true;
             confirmDeleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Deleting...';
 
@@ -350,62 +926,262 @@
                     body: JSON.stringify({ doc_id: currentDocId })
                 });
 
-                // Get response data
                 const data = await response.json();
-
-                // Hide modal
                 deleteModal.hide();
 
                 if (!response.ok) {
-                    // Show error message
-                    const errorMessage = data.error || 'Failed to delete document';
-                    const alertDiv = document.createElement('div');
-                    alertDiv.className = 'alert alert-danger alert-dismissible fade show';
-                    alertDiv.innerHTML = `
-                        <strong>Error!</strong> ${errorMessage}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    `;
-                    document.querySelector('.document-container').prepend(alertDiv);
-                    console.error('Server error:', errorMessage);
+                    showAlert('danger', `Error: ${data.error || 'Failed to delete document'}`);
                 } else {
+                    showAlert('success', `Document "${currentDocId}" has been deleted.`);
                     // Reload documents
                     loadingIndicator.classList.remove('d-none');
                     documentList.classList.add('d-none');
                     emptyState.classList.add('d-none');
                     loadDocuments();
-
-                    // Show success message
-                    const alertDiv = document.createElement('div');
-                    alertDiv.className = 'alert alert-success alert-dismissible fade show';
-                    alertDiv.innerHTML = `
-                        <strong>Success!</strong> Document "${currentDocId}" has been deleted.
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    `;
-                    document.querySelector('.document-container').prepend(alertDiv);
                 }
 
-                // Reset current doc id
                 currentDocId = null;
             } catch (error) {
                 console.error('Error deleting document:', error);
-
-                // Hide modal
                 deleteModal.hide();
-
-                // Show error message
-                const alertDiv = document.createElement('div');
-                alertDiv.className = 'alert alert-danger alert-dismissible fade show';
-                alertDiv.innerHTML = `
-                    <strong>Error!</strong> Failed to delete document: ${error.message}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                `;
-                document.querySelector('.document-container').prepend(alertDiv);
+                showAlert('danger', `Failed to delete document: ${error.message}`);
             } finally {
-                // Reset button state
                 confirmDeleteBtn.disabled = false;
                 confirmDeleteBtn.innerHTML = 'Delete';
             }
         });
+
+        // Folder Management Functions
+        function createFolder() {
+            const folderName = document.getElementById('folderName').value.trim();
+            const folderDescription = document.getElementById('folderDescription').value.trim();
+
+            if (!folderName) {
+                showAlert('danger', 'Please enter a folder name.');
+                return;
+            }
+
+            if (folders.includes(folderName.toLowerCase())) {
+                showAlert('danger', 'A folder with this name already exists.');
+                return;
+            }
+
+            // Add folder to local storage (in a real app, this would be saved to backend)
+            folders.push(folderName);
+            localStorage.setItem('documentFolders', JSON.stringify(folders));
+
+            // Update folder tree
+            renderFolders();
+
+            // Close modal and reset form
+            createFolderModal.hide();
+            document.getElementById('createFolderForm').reset();
+
+            showAlert('success', `Folder "${folderName}" created successfully.`);
+        }
+
+        function showMoveDocumentModal(docId) {
+            currentDocId = docId;
+            document.getElementById('moveDocName').textContent = docId;
+
+            // Populate folder selection
+            const folderSelection = document.getElementById('folderSelection');
+            folderSelection.innerHTML = '';
+
+            folders.forEach(folder => {
+                if (folder !== 'all') {
+                    const folderOption = document.createElement('div');
+                    folderOption.className = 'folder-option';
+                    folderOption.style.cssText = `
+                        padding: 0.75rem;
+                        border: 2px solid #e2e8f0;
+                        border-radius: 8px;
+                        margin-bottom: 0.5rem;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        display: flex;
+                        align-items: center;
+                        gap: 0.5rem;
+                    `;
+
+                    folderOption.innerHTML = `
+                        <i class="fas fa-folder"></i>
+                        <span>${folder === 'uncategorized' ? 'Uncategorized' : folder}</span>
+                    `;
+
+                    folderOption.addEventListener('click', function() {
+                        // Remove active class from all options
+                        folderSelection.querySelectorAll('.folder-option').forEach(opt => {
+                            opt.style.borderColor = '#e2e8f0';
+                            opt.style.backgroundColor = 'white';
+                        });
+
+                        // Add active class to selected option
+                        this.style.borderColor = 'var(--primary-color)';
+                        this.style.backgroundColor = '#f0f4ff';
+                        this.setAttribute('data-selected', 'true');
+                    });
+
+                    folderSelection.appendChild(folderOption);
+                }
+            });
+
+            moveDocumentModal.show();
+        }
+
+        function moveDocument() {
+            const selectedFolder = document.querySelector('.folder-option[data-selected="true"]');
+            if (!selectedFolder) {
+                showAlert('danger', 'Please select a folder.');
+                return;
+            }
+
+            const folderName = selectedFolder.querySelector('span').textContent;
+
+            // Update document folder in local storage (in a real app, this would update the backend)
+            const docIndex = allDocuments.findIndex(doc => doc.doc_id === currentDocId);
+            if (docIndex !== -1) {
+                allDocuments[docIndex].folder = folderName === 'Uncategorized' ? 'uncategorized' : folderName;
+                localStorage.setItem('documentFolders_' + currentDocId, folderName);
+            }
+
+            // Close modal
+            moveDocumentModal.hide();
+
+            // Refresh display
+            applyFilters();
+            renderFolders();
+
+            showAlert('success', `Document "${currentDocId}" moved to "${folderName}".`);
+            currentDocId = null;
+        }
+
+        function renderFolders() {
+            const folderTree = document.getElementById('folderTree');
+
+            // Keep the "All Documents" and "Uncategorized" items
+            const allDocsItem = folderTree.querySelector('[data-folder="all"]');
+            const uncategorizedItem = folderTree.querySelector('[data-folder="uncategorized"]');
+
+            // Clear and rebuild
+            folderTree.innerHTML = '';
+            folderTree.appendChild(allDocsItem);
+            folderTree.appendChild(uncategorizedItem);
+
+            // Add event listeners to default folders
+            allDocsItem.addEventListener('click', () => selectFolder('all'));
+            uncategorizedItem.addEventListener('click', () => selectFolder('uncategorized'));
+
+            // Add custom folders
+            folders.forEach(folder => {
+                if (folder !== 'all' && folder !== 'uncategorized') {
+                    const folderItem = document.createElement('div');
+                    folderItem.className = 'folder-item';
+                    folderItem.setAttribute('data-folder', folder);
+
+                    const docCount = allDocuments.filter(doc => doc.folder === folder).length;
+
+                    folderItem.innerHTML = `
+                        <div style="display: flex; align-items: center; flex: 1;">
+                            <i class="fas fa-folder me-2"></i>${folder}
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span class="folder-count">${docCount}</span>
+                            <div class="folder-actions">
+                                <button class="folder-action-btn btn-edit-folder" title="Rename folder">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="folder-action-btn btn-delete-folder" title="Delete folder">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+
+                    folderItem.addEventListener('click', (e) => {
+                        if (!e.target.closest('.folder-actions')) {
+                            selectFolder(folder);
+                        }
+                    });
+
+                    folderTree.appendChild(folderItem);
+                }
+            });
+
+            // Update document counts
+            updateFolderCounts();
+        }
+
+        function selectFolder(folder) {
+            currentFolder = folder;
+
+            // Update active folder
+            document.querySelectorAll('.folder-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            document.querySelector(`[data-folder="${folder}"]`).classList.add('active');
+
+            // Apply filters
+            applyFilters();
+        }
+
+        function updateFolderCounts() {
+            const allCount = allDocuments.length;
+            const uncategorizedCount = allDocuments.filter(doc => !doc.folder || doc.folder === 'uncategorized').length;
+
+            document.getElementById('allDocsCount').textContent = allCount;
+            document.getElementById('uncategorizedCount').textContent = uncategorizedCount;
+
+            // Update custom folder counts
+            folders.forEach(folder => {
+                if (folder !== 'all' && folder !== 'uncategorized') {
+                    const count = allDocuments.filter(doc => doc.folder === folder).length;
+                    const countElement = document.querySelector(`[data-folder="${folder}"] .folder-count`);
+                    if (countElement) {
+                        countElement.textContent = count;
+                    }
+                }
+            });
+        }
+
+        // Load folders from localStorage
+        function loadFolders() {
+            const savedFolders = localStorage.getItem('documentFolders');
+            if (savedFolders) {
+                folders = JSON.parse(savedFolders);
+            }
+
+            // Load document folder assignments
+            allDocuments.forEach(doc => {
+                const savedFolder = localStorage.getItem('documentFolders_' + doc.doc_id);
+                if (savedFolder) {
+                    doc.folder = savedFolder === 'Uncategorized' ? 'uncategorized' : savedFolder;
+                }
+            });
+        }
+
+        // Utility functions
+        function showAlert(type, message) {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+            alertDiv.innerHTML = `
+                <strong>${type === 'success' ? 'Success!' : 'Error!'}</strong> ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
+            document.querySelector('.document-container').prepend(alertDiv);
+        }
+
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
     });
 </script>
 {% endblock %}
