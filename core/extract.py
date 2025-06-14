@@ -15,7 +15,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import OCR_LANGUAGE, OCR_DPI, POPPLER_PATH, MAX_WORKERS, EMBEDDING_MODEL
 
 # Optional: Set this only if Tesseract is not in your system PATH
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+# pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 # Initialize the embedding model
 model = SentenceTransformer(EMBEDDING_MODEL)

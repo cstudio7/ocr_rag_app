@@ -2,6 +2,7 @@
 Configuration settings for the PDF Knowledge Base application.
 """
 import os
+import platform
 import logging
 from pathlib import Path
 from datetime import timedelta
@@ -57,8 +58,8 @@ COLLECTION_NAME = "documents"
 # OCR configuration
 OCR_LANGUAGE = "eng"
 OCR_DPI = 200  # Lower for faster processing, higher for better quality
-POPPLER_PATH = r"C:\\poppler-23.11.0\\Library\\bin"  # Adjust for your system
-
+# POPPLER_PATH = r"C:\\poppler-23.11.0\\Library\\bin"  # Adjust for your system
+POPPLER_PATH = r"C:\poppler-23.11.0\Library\bin" if platform.system().lower() == "windows" else None
 # Parallel processing
 MAX_WORKERS = None  # None = use CPU count - 1
 

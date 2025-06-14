@@ -1,113 +1,178 @@
-from pdf2image import convert_from_path
-import pytesseract
-from concurrent.futures import ThreadPoolExecutor
+"""
+Text extraction module for PDF documents.
+Uses OCR to extract text from scanned PDFs and generate sentence embeddings.
+"""
+
+import os
+import sys
+import platform
 import logging
+import shutil
+from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 
-# Optional: Set this only if Tesseract is not in your system PATH
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+import pytesseract
+from pdf2image import convert_from_path
+from sentence_transformers import SentenceTransformer
 
-def process_image(args):
-    """
-    Process a single image with OCR.
+# Configuration constants (can be moved to a config file)
+OCR_LANGUAGE = "eng"
+OCR_DPI = 200
+MAX_WORKERS = 4
+EMBEDDING_MODEL = "all-MiniLM-L6-v2"
+DEFAULT_POPPLER_PATH = "/opt/homebrew/bin"  # Adjust if needed for macOS
 
-    Args:
-        args: Tuple of (image, page_num, lang)
+# Configure logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-    Returns:
-        Dict with page_num and extracted text
-    """
-    image, page_num, lang = args
+
+def get_tesseract_path():
+    """Detect and return the tesseract executable path."""
+    if platform.system().lower() == "windows":
+        path = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+        if not os.path.isfile(path):
+            raise FileNotFoundError(f"Tesseract not found at {path}")
+        return path
+    else:
+        path = shutil.which("tesseract")
+        if path is None:
+            raise FileNotFoundError("Tesseract not found in PATH. Install it via `brew install tesseract`.")
+        return path
+
+
+def get_poppler_path():
+    """Return poppler path based on OS."""
+    if platform.system().lower() == "windows":
+        return os.getenv("POPPLER_PATH", None)  # Set in environment or config
+    return DEFAULT_POPPLER_PATH
+
+
+def initialize_ocr():
+    """Configure pytesseract with the correct binary path."""
+    tesseract_path = get_tesseract_path()
+    pytesseract.pytesseract.tesseract_cmd = tesseract_path
+    logging.info(f"Tesseract found at: {tesseract_path}")
+
+
+def load_model(model_name):
+    """Load SentenceTransformer model."""
     try:
-        logging.info(f"OCR processing page {page_num}...")
-        text = pytesseract.image_to_string(image, lang=lang)
-        return {
-            'page_num': page_num,
-            'text': text.strip()
-        }
+        return SentenceTransformer(model_name)
     except Exception as e:
-        logging.error(f"Error processing page {page_num}: {e}")
-        return {
-            'page_num': page_num,
-            'text': ""
-        }
+        logging.error(f"Failed to load embedding model: {e}")
+        raise
 
-def extract_text_by_page(pdf_path, lang='eng', poppler_path=None, max_workers=None, dpi=200, page_ranges=None):
-    """
-    Extracts text from each page of a scanned PDF using Tesseract OCR in parallel.
-    Optimized for speed with lower DPI and page range processing.
 
-    Args:
-        pdf_path (str): Path to the input PDF file.
-        lang (str): Language code for OCR (e.g., 'eng').
-        poppler_path (str): Optional poppler binary path (Windows only).
-        max_workers (int): Maximum number of worker threads for OCR. Default is None (uses CPU count).
-        dpi (int): DPI for image conversion. Lower values are faster but less accurate.
-        page_ranges (list): Optional list of page ranges to process, e.g. [(1,10), (20,30)].
-                           If None, processes all pages.
+def convert_pdf_to_images(pdf_path, dpi=OCR_DPI, poppler_path=None, page_ranges=None):
+    """Convert PDF pages to images (optionally by range)."""
+    poppler_path = poppler_path or get_poppler_path()
 
-    Returns:
-        List[Dict]: List of {'page_num': int, 'text': str}
-    """
     try:
-        logging.info(f"Converting PDF to images: {pdf_path}")
-
-        # Process specific page ranges if provided
         if page_ranges:
-            all_images = []
-            all_page_nums = []
-
+            images, page_nums = [], []
             for start, end in page_ranges:
-                logging.info(f"Converting pages {start} to {end}...")
-                # Note: pdf2image uses 1-based indexing for first_page, last_page
-                images = convert_from_path(
-                    pdf_path,
-                    dpi=dpi,
-                    poppler_path=poppler_path,
-                    first_page=start,
-                    last_page=end
+                partial_images = convert_from_path(
+                    pdf_path, dpi=dpi, poppler_path=poppler_path, first_page=start, last_page=end
                 )
-                all_images.extend(images)
-                all_page_nums.extend(range(start, end + 1))
-
-            images = all_images
-            page_nums = all_page_nums
+                images.extend(partial_images)
+                page_nums.extend(range(start, end + 1))
         else:
-            # Convert all pages at once
             images = convert_from_path(pdf_path, dpi=dpi, poppler_path=poppler_path)
             page_nums = list(range(1, len(images) + 1))
 
-        logging.info(f"PDF converted to {len(images)} images")
-
-        # Prepare arguments for parallel processing
-        process_args = [(image, page_num, lang) for image, page_num in zip(images, page_nums)]
-
-        # Use ThreadPoolExecutor for OCR (I/O bound task)
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # Process in smaller chunks to avoid memory issues
-            chunk_size = 20  # Process 20 pages at a time
-            all_results = []
-
-            for i in range(0, len(process_args), chunk_size):
-                chunk = process_args[i:i+chunk_size]
-                logging.info(f"Processing OCR batch {i//chunk_size + 1}/{(len(process_args)-1)//chunk_size + 1}...")
-                results = list(executor.map(process_image, chunk))
-                all_results.extend(results)
-
-        # Sort results by page number to maintain order
-        all_results.sort(key=lambda x: x['page_num'])
-        return all_results
+        logging.info(f"Converted {len(images)} pages from PDF.")
+        return list(zip(images, page_nums))
 
     except Exception as e:
-        logging.error(f"Error during PDF conversion: {e}")
+        logging.error(f"PDF to image conversion failed: {e}")
         return []
 
-# Example usage
+
+def perform_ocr(image, lang=OCR_LANGUAGE):
+    """Run Tesseract OCR on a PIL image."""
+    try:
+        return pytesseract.image_to_string(image, lang=lang).strip()
+    except Exception as e:
+        logging.error(f"OCR failed: {e}")
+        return ""
+
+
+def process_image(args):
+    image, page_num, lang = args
+    text = perform_ocr(image, lang)
+    return {'page_num': page_num, 'text': text}
+
+
+def extract_text_by_page(pdf_path, lang=OCR_LANGUAGE, page_ranges=None, max_workers=MAX_WORKERS):
+    """Extract OCR text from a PDF using parallel threads."""
+    images_with_nums = convert_pdf_to_images(pdf_path, page_ranges=page_ranges)
+    if not images_with_nums:
+        return []
+
+    args = [(img, page, lang) for img, page in images_with_nums]
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        results = list(executor.map(process_image, args))
+
+    return sorted(results, key=lambda x: x['page_num'])
+
+
+def chunk_text(text, max_length=500):
+    """Split text into clean chunks with length constraints."""
+    lines = text.strip().split('\n')
+    chunks, current = [], ""
+
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        if len(current) + len(line) > max_length:
+            if current:
+                chunks.append(current.strip())
+            current = line
+        else:
+            current += (" " + line) if current else line
+
+    if current:
+        chunks.append(current.strip())
+
+    return chunks
+
+
+def generate_embeddings(text_chunks, model):
+    """Encode text chunks using a transformer model."""
+    try:
+        return model.encode(text_chunks, show_progress_bar=False)
+    except Exception as e:
+        logging.error(f"Embedding generation failed: {e}")
+        return []
+
+
+# ----------------
+# Example Usage
+# ----------------
 if __name__ == "__main__":
-    pdf_file = "TMC0058.pdf"
-    poppler_bin_path = r"C:\poppler\bin"  # Change if your poppler is elsewhere
+    import argparse
 
-    results = extract_text_by_page(pdf_file, poppler_path=poppler_bin_path)
+    parser = argparse.ArgumentParser(description="Extract and embed text from a scanned PDF.")
+    parser.add_argument("pdf", help="Path to the PDF file")
+    args = parser.parse_args()
 
-    for page in results:
-        print(f"\n--- Page {page['page_num']} ---")
-        print(page['text'][:500])  # Preview first 500 characters
+    try:
+        initialize_ocr()
+        model = load_model(EMBEDDING_MODEL)
+
+        results = extract_text_by_page(args.pdf)
+        for page in results:
+            logging.info(f"Page {page['page_num']}: {len(page['text'])} characters extracted.")
+
+        all_chunks = []
+        for result in results:
+            chunks = chunk_text(result['text'])
+            all_chunks.extend(chunks)
+
+        embeddings = generate_embeddings(all_chunks, model)
+        logging.info(f"Generated {len(embeddings)} embeddings.")
+
+    except Exception as ex:
+        logging.exception(f"Unhandled exception: {ex}")

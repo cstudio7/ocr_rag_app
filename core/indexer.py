@@ -158,7 +158,7 @@ def process_and_embed_pages(file_path, doc_id):
         # Fallback method: try to get page count using pdf2image
         try:
             import subprocess
-            # Try using pdfinfo from poppler if available
+            # Try using pdf-info from poppler if available
             cmd = os.path.join(POPPLER_PATH, "pdfinfo.exe") if os.name == 'nt' else "pdfinfo"
 
             output = subprocess.check_output([cmd, file_path], universal_newlines=True)
