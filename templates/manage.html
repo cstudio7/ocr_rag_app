@@ -952,236 +952,413 @@
         });
 
         // Folder Management Functions
-        function createFolder() {
-            const folderName = document.getElementById('folderName').value.trim();
-            const folderDescription = document.getElementById('folderDescription').value.trim();
+    //     function createFolder() {
+    //         const folderName = document.getElementById('folderName').value.trim();
+    //         const folderDescription = document.getElementById('folderDescription').value.trim();
 
-            if (!folderName) {
-                showAlert('danger', 'Please enter a folder name.');
-                return;
-            }
+    //         if (!folderName) {
+    //             showAlert('danger', 'Please enter a folder name.');
+    //             return;
+    //         }
 
-            if (folders.includes(folderName.toLowerCase())) {
-                showAlert('danger', 'A folder with this name already exists.');
-                return;
-            }
+    //         if (folders.includes(folderName.toLowerCase())) {
+    //             showAlert('danger', 'A folder with this name already exists.');
+    //             return;
+    //         }
 
-            // Add folder to local storage (in a real app, this would be saved to backend)
-            folders.push(folderName);
-            localStorage.setItem('documentFolders', JSON.stringify(folders));
+    //         // Add folder to local storage (in a real app, this would be saved to backend)
+    //         folders.push(folderName);
+    //         localStorage.setItem('documentFolders', JSON.stringify(folders));
 
-            // Update folder tree
-            renderFolders();
+    //         // Update folder tree
+    //         renderFolders();
 
-            // Close modal and reset form
+    //         // Close modal and reset form
+    //         createFolderModal.hide();
+    //         document.getElementById('createFolderForm').reset();
+
+    //         showAlert('success', `Folder "${folderName}" created successfully.`);
+    //     }
+
+    //     function showMoveDocumentModal(docId) {
+    //         currentDocId = docId;
+    //         document.getElementById('moveDocName').textContent = docId;
+
+    //         // Populate folder selection
+    //         const folderSelection = document.getElementById('folderSelection');
+    //         folderSelection.innerHTML = '';
+
+    //         folders.forEach(folder => {
+    //             if (folder !== 'all') {
+    //                 const folderOption = document.createElement('div');
+    //                 folderOption.className = 'folder-option';
+    //                 folderOption.style.cssText = `
+    //                     padding: 0.75rem;
+    //                     border: 2px solid #e2e8f0;
+    //                     border-radius: 8px;
+    //                     margin-bottom: 0.5rem;
+    //                     cursor: pointer;
+    //                     transition: all 0.3s ease;
+    //                     display: flex;
+    //                     align-items: center;
+    //                     gap: 0.5rem;
+    //                 `;
+
+    //                 folderOption.innerHTML = `
+    //                     <i class="fas fa-folder"></i>
+    //                     <span>${folder === 'uncategorized' ? 'Uncategorized' : folder}</span>
+    //                 `;
+
+    //                 folderOption.addEventListener('click', function() {
+    //                     // Remove active class from all options
+    //                     folderSelection.querySelectorAll('.folder-option').forEach(opt => {
+    //                         opt.style.borderColor = '#e2e8f0';
+    //                         opt.style.backgroundColor = 'white';
+    //                     });
+
+    //                     // Add active class to selected option
+    //                     this.style.borderColor = 'var(--primary-color)';
+    //                     this.style.backgroundColor = '#f0f4ff';
+    //                     this.setAttribute('data-selected', 'true');
+    //                 });
+
+    //                 folderSelection.appendChild(folderOption);
+    //             }
+    //         });
+
+    //         moveDocumentModal.show();
+    //     }
+
+    //     function moveDocument() {
+    //         const selectedFolder = document.querySelector('.folder-option[data-selected="true"]');
+    //         if (!selectedFolder) {
+    //             showAlert('danger', 'Please select a folder.');
+    //             return;
+    //         }
+
+    //         const folderName = selectedFolder.querySelector('span').textContent;
+
+    //         // Update document folder in local storage (in a real app, this would update the backend)
+    //         const docIndex = allDocuments.findIndex(doc => doc.doc_id === currentDocId);
+    //         if (docIndex !== -1) {
+    //             allDocuments[docIndex].folder = folderName === 'Uncategorized' ? 'uncategorized' : folderName;
+    //             localStorage.setItem('documentFolders_' + currentDocId, folderName);
+    //         }
+
+    //         // Close modal
+    //         moveDocumentModal.hide();
+
+    //         // Refresh display
+    //         applyFilters();
+    //         renderFolders();
+
+    //         showAlert('success', `Document "${currentDocId}" moved to "${folderName}".`);
+    //         currentDocId = null;
+    //     }
+
+    //     function renderFolders() {
+    //         const folderTree = document.getElementById('folderTree');
+
+    //         // Keep the "All Documents" and "Uncategorized" items
+    //         const allDocsItem = folderTree.querySelector('[data-folder="all"]');
+    //         const uncategorizedItem = folderTree.querySelector('[data-folder="uncategorized"]');
+
+    //         // Clear and rebuild
+    //         folderTree.innerHTML = '';
+    //         folderTree.appendChild(allDocsItem);
+    //         folderTree.appendChild(uncategorizedItem);
+
+    //         // Add event listeners to default folders
+    //         allDocsItem.addEventListener('click', () => selectFolder('all'));
+    //         uncategorizedItem.addEventListener('click', () => selectFolder('uncategorized'));
+
+    //         // Add custom folders
+    //         folders.forEach(folder => {
+    //             if (folder !== 'all' && folder !== 'uncategorized') {
+    //                 const folderItem = document.createElement('div');
+    //                 folderItem.className = 'folder-item';
+    //                 folderItem.setAttribute('data-folder', folder);
+
+    //                 const docCount = allDocuments.filter(doc => doc.folder === folder).length;
+
+    //                 folderItem.innerHTML = `
+    //                     <div style="display: flex; align-items: center; flex: 1;">
+    //                         <i class="fas fa-folder me-2"></i>${folder}
+    //                     </div>
+    //                     <div style="display: flex; align-items: center; gap: 0.5rem;">
+    //                         <span class="folder-count">${docCount}</span>
+    //                         <div class="folder-actions">
+    //                             <button class="folder-action-btn btn-edit-folder" title="Rename folder">
+    //                                 <i class="fas fa-edit"></i>
+    //                             </button>
+    //                             <button class="folder-action-btn btn-delete-folder" title="Delete folder">
+    //                                 <i class="fas fa-trash"></i>
+    //                             </button>
+    //                         </div>
+    //                     </div>
+    //                 `;
+
+    //                 folderItem.addEventListener('click', (e) => {
+    //                     if (!e.target.closest('.folder-actions')) {
+    //                         selectFolder(folder);
+    //                     }
+    //                 });
+
+    //                 folderTree.appendChild(folderItem);
+    //             }
+    //         });
+
+    //         // Update document counts
+    //         updateFolderCounts();
+    //     }
+
+    //     function selectFolder(folder) {
+    //         currentFolder = folder;
+
+    //         // Update active folder
+    //         document.querySelectorAll('.folder-item').forEach(item => {
+    //             item.classList.remove('active');
+    //         });
+    //         document.querySelector(`[data-folder="${folder}"]`).classList.add('active');
+
+    //         // Apply filters
+    //         applyFilters();
+    //     }
+
+    //     function updateFolderCounts() {
+    //         const allCount = allDocuments.length;
+    //         const uncategorizedCount = allDocuments.filter(doc => !doc.folder || doc.folder === 'uncategorized').length;
+
+    //         document.getElementById('allDocsCount').textContent = allCount;
+    //         document.getElementById('uncategorizedCount').textContent = uncategorizedCount;
+
+    //         // Update custom folder counts
+    //         folders.forEach(folder => {
+    //             if (folder !== 'all' && folder !== 'uncategorized') {
+    //                 const count = allDocuments.filter(doc => doc.folder === folder).length;
+    //                 const countElement = document.querySelector(`[data-folder="${folder}"] .folder-count`);
+    //                 if (countElement) {
+    //                     countElement.textContent = count;
+    //                 }
+    //             }
+    //         });
+    //     }
+
+    //     // Load folders from localStorage
+    //     function loadFolders() {
+    //         const savedFolders = localStorage.getItem('documentFolders');
+    //         if (savedFolders) {
+    //             folders = JSON.parse(savedFolders);
+    //         }
+
+    //         // Load document folder assignments
+    //         allDocuments.forEach(doc => {
+    //             const savedFolder = localStorage.getItem('documentFolders_' + doc.doc_id);
+    //             if (savedFolder) {
+    //                 doc.folder = savedFolder === 'Uncategorized' ? 'uncategorized' : savedFolder;
+    //             }
+    //         });
+    //     }
+
+    //     // Utility functions
+    //     function showAlert(type, message) {
+    //         const alertDiv = document.createElement('div');
+    //         alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    //         alertDiv.innerHTML = `
+    //             <strong>${type === 'success' ? 'Success!' : 'Error!'}</strong> ${message}
+    //             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    //         `;
+    //         document.querySelector('.document-container').prepend(alertDiv);
+    //     }
+
+    //     function debounce(func, wait) {
+    //         let timeout;
+    //         return function executedFunction(...args) {
+    //             const later = () => {
+    //                 clearTimeout(timeout);
+    //                 func(...args);
+    //             };
+    //             clearTimeout(timeout);
+    //             timeout = setTimeout(later, wait);
+    //         };
+    //     }
+    // });
+    // Updated folder logic to use backend instead of localStorage
+
+// Updated folder logic to use backend instead of localStorage
+
+function createFolder() {
+    const folderName = document.getElementById('folderName').value.trim();
+    if (!folderName) {
+        showAlert('danger', 'Please enter a folder name.');
+        return;
+    }
+
+    fetch('/api/folders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: folderName })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert('success', `Folder "${folderName}" created successfully.`);
             createFolderModal.hide();
             document.getElementById('createFolderForm').reset();
-
-            showAlert('success', `Folder "${folderName}" created successfully.`);
+            loadingIndicator.classList.remove('d-none');
+            documentList.classList.add('d-none');
+            emptyState.classList.add('d-none');
+            loadDocuments();
+        } else {
+            showAlert('danger', data.error || 'Failed to create folder.');
         }
+    })
+    .catch(error => {
+        console.error('Error creating folder:', error);
+        showAlert('danger', 'An error occurred while creating folder.');
+    });
+}
 
-        function showMoveDocumentModal(docId) {
-            currentDocId = docId;
-            document.getElementById('moveDocName').textContent = docId;
-
-            // Populate folder selection
-            const folderSelection = document.getElementById('folderSelection');
-            folderSelection.innerHTML = '';
-
-            folders.forEach(folder => {
-                if (folder !== 'all') {
-                    const folderOption = document.createElement('div');
-                    folderOption.className = 'folder-option';
-                    folderOption.style.cssText = `
-                        padding: 0.75rem;
-                        border: 2px solid #e2e8f0;
-                        border-radius: 8px;
-                        margin-bottom: 0.5rem;
-                        cursor: pointer;
-                        transition: all 0.3s ease;
-                        display: flex;
-                        align-items: center;
-                        gap: 0.5rem;
-                    `;
-
-                    folderOption.innerHTML = `
-                        <i class="fas fa-folder"></i>
-                        <span>${folder === 'uncategorized' ? 'Uncategorized' : folder}</span>
-                    `;
-
-                    folderOption.addEventListener('click', function() {
-                        // Remove active class from all options
-                        folderSelection.querySelectorAll('.folder-option').forEach(opt => {
-                            opt.style.borderColor = '#e2e8f0';
-                            opt.style.backgroundColor = 'white';
-                        });
-
-                        // Add active class to selected option
-                        this.style.borderColor = 'var(--primary-color)';
-                        this.style.backgroundColor = '#f0f4ff';
-                        this.setAttribute('data-selected', 'true');
-                    });
-
-                    folderSelection.appendChild(folderOption);
-                }
-            });
-
-            moveDocumentModal.show();
-        }
-
-        function moveDocument() {
-            const selectedFolder = document.querySelector('.folder-option[data-selected="true"]');
-            if (!selectedFolder) {
-                showAlert('danger', 'Please select a folder.');
-                return;
-            }
-
-            const folderName = selectedFolder.querySelector('span').textContent;
-
-            // Update document folder in local storage (in a real app, this would update the backend)
-            const docIndex = allDocuments.findIndex(doc => doc.doc_id === currentDocId);
-            if (docIndex !== -1) {
-                allDocuments[docIndex].folder = folderName === 'Uncategorized' ? 'uncategorized' : folderName;
-                localStorage.setItem('documentFolders_' + currentDocId, folderName);
-            }
-
-            // Close modal
-            moveDocumentModal.hide();
-
-            // Refresh display
-            applyFilters();
+function loadFolders() {
+    fetch('/api/folders')
+        .then(res => res.json())
+        .then(data => {
+            folders = ['all', 'uncategorized', ...data.filter(f => f !== 'all' && f !== 'uncategorized')];
             renderFolders();
+        })
+        .catch(error => {
+            console.error('Failed to load folders from backend:', error);
+        });
+}
 
-            showAlert('success', `Document "${currentDocId}" moved to "${folderName}".`);
-            currentDocId = null;
-        }
+function renderFolders() {
+    const folderTree = document.getElementById('folderTree');
+    folderTree.innerHTML = '';
 
-        function renderFolders() {
-            const folderTree = document.getElementById('folderTree');
+    const defaultFolders = [
+        { name: 'all', icon: 'fa-home' },
+        { name: 'uncategorized', icon: 'fa-folder' }
+    ];
 
-            // Keep the "All Documents" and "Uncategorized" items
-            const allDocsItem = folderTree.querySelector('[data-folder="all"]');
-            const uncategorizedItem = folderTree.querySelector('[data-folder="uncategorized"]');
+    defaultFolders.forEach(df => {
+        const item = document.createElement('div');
+        item.className = 'folder-item';
+        item.setAttribute('data-folder', df.name);
+        item.innerHTML = `
+            <i class="fas ${df.icon} me-2"></i>${df.name.charAt(0).toUpperCase() + df.name.slice(1)}
+            <span class="folder-count" id="${df.name}DocsCount">0</span>
+        `;
+        item.addEventListener('click', () => selectFolder(df.name));
+        folderTree.appendChild(item);
+    });
 
-            // Clear and rebuild
-            folderTree.innerHTML = '';
-            folderTree.appendChild(allDocsItem);
-            folderTree.appendChild(uncategorizedItem);
+    folders.forEach(folder => {
+        if (folder !== 'all' && folder !== 'uncategorized') {
+            const folderItem = document.createElement('div');
+            folderItem.className = 'folder-item';
+            folderItem.setAttribute('data-folder', folder);
 
-            // Add event listeners to default folders
-            allDocsItem.addEventListener('click', () => selectFolder('all'));
-            uncategorizedItem.addEventListener('click', () => selectFolder('uncategorized'));
+            const docCount = allDocuments.filter(doc => doc.folder === folder).length;
 
-            // Add custom folders
-            folders.forEach(folder => {
-                if (folder !== 'all' && folder !== 'uncategorized') {
-                    const folderItem = document.createElement('div');
-                    folderItem.className = 'folder-item';
-                    folderItem.setAttribute('data-folder', folder);
-
-                    const docCount = allDocuments.filter(doc => doc.folder === folder).length;
-
-                    folderItem.innerHTML = `
-                        <div style="display: flex; align-items: center; flex: 1;">
-                            <i class="fas fa-folder me-2"></i>${folder}
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                            <span class="folder-count">${docCount}</span>
-                            <div class="folder-actions">
-                                <button class="folder-action-btn btn-edit-folder" title="Rename folder">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button class="folder-action-btn btn-delete-folder" title="Delete folder">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
-                        </div>
-                    `;
-
-                    folderItem.addEventListener('click', (e) => {
-                        if (!e.target.closest('.folder-actions')) {
-                            selectFolder(folder);
-                        }
-                    });
-
-                    folderTree.appendChild(folderItem);
-                }
-            });
-
-            // Update document counts
-            updateFolderCounts();
-        }
-
-        function selectFolder(folder) {
-            currentFolder = folder;
-
-            // Update active folder
-            document.querySelectorAll('.folder-item').forEach(item => {
-                item.classList.remove('active');
-            });
-            document.querySelector(`[data-folder="${folder}"]`).classList.add('active');
-
-            // Apply filters
-            applyFilters();
-        }
-
-        function updateFolderCounts() {
-            const allCount = allDocuments.length;
-            const uncategorizedCount = allDocuments.filter(doc => !doc.folder || doc.folder === 'uncategorized').length;
-
-            document.getElementById('allDocsCount').textContent = allCount;
-            document.getElementById('uncategorizedCount').textContent = uncategorizedCount;
-
-            // Update custom folder counts
-            folders.forEach(folder => {
-                if (folder !== 'all' && folder !== 'uncategorized') {
-                    const count = allDocuments.filter(doc => doc.folder === folder).length;
-                    const countElement = document.querySelector(`[data-folder="${folder}"] .folder-count`);
-                    if (countElement) {
-                        countElement.textContent = count;
-                    }
-                }
-            });
-        }
-
-        // Load folders from localStorage
-        function loadFolders() {
-            const savedFolders = localStorage.getItem('documentFolders');
-            if (savedFolders) {
-                folders = JSON.parse(savedFolders);
-            }
-
-            // Load document folder assignments
-            allDocuments.forEach(doc => {
-                const savedFolder = localStorage.getItem('documentFolders_' + doc.doc_id);
-                if (savedFolder) {
-                    doc.folder = savedFolder === 'Uncategorized' ? 'uncategorized' : savedFolder;
-                }
-            });
-        }
-
-        // Utility functions
-        function showAlert(type, message) {
-            const alertDiv = document.createElement('div');
-            alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
-            alertDiv.innerHTML = `
-                <strong>${type === 'success' ? 'Success!' : 'Error!'}</strong> ${message}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            folderItem.innerHTML = `
+                <div style="display: flex; align-items: center; flex: 1;">
+                    <i class="fas fa-folder me-2"></i>${folder}
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span class="folder-count">${docCount}</span>
+                </div>
             `;
-            document.querySelector('.document-container').prepend(alertDiv);
-        }
 
-        function debounce(func, wait) {
-            let timeout;
-            return function executedFunction(...args) {
-                const later = () => {
-                    clearTimeout(timeout);
-                    func(...args);
-                };
-                clearTimeout(timeout);
-                timeout = setTimeout(later, wait);
-            };
+            folderItem.addEventListener('click', () => selectFolder(folder));
+            folderTree.appendChild(folderItem);
         }
     });
+
+    updateFolderCounts();
+}
+
+function showMoveDocumentModal(docId) {
+    currentDocId = docId;
+    document.getElementById('moveDocName').textContent = docId;
+    const folderSelection = document.getElementById('folderSelection');
+    folderSelection.innerHTML = '';
+
+    folders.forEach(folder => {
+        if (folder !== 'all') {
+            const folderOption = document.createElement('div');
+            folderOption.className = 'folder-option';
+            folderOption.innerHTML = `
+                <i class="fas fa-folder"></i>
+                <span>${folder === 'uncategorized' ? 'Uncategorized' : folder}</span>
+            `;
+            folderOption.addEventListener('click', function() {
+                folderSelection.querySelectorAll('.folder-option').forEach(opt => {
+                    opt.style.borderColor = '#e2e8f0';
+                    opt.style.backgroundColor = 'white';
+                });
+                this.style.borderColor = 'var(--primary-color)';
+                this.style.backgroundColor = '#f0f4ff';
+                this.setAttribute('data-selected', 'true');
+            });
+            folderSelection.appendChild(folderOption);
+        }
+    });
+
+    moveDocumentModal.show();
+}
+
+function moveDocument() {
+    const selectedFolder = document.querySelector('.folder-option[data-selected="true"]');
+    if (!selectedFolder) {
+        showAlert('danger', 'Please select a folder.');
+        return;
+    }
+
+    const folderName = selectedFolder.querySelector('span').textContent;
+
+    fetch('/api/move-document', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ doc_id: currentDocId, new_folder: folderName })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            moveDocumentModal.hide();
+            showAlert('success', `Document "${currentDocId}" moved to "${folderName}".`);
+            loadDocuments();
+        } else {
+            showAlert('danger', data.error || 'Failed to move document.');
+        }
+    })
+    .catch(error => {
+        console.error('Error moving document:', error);
+        showAlert('danger', 'An error occurred while moving document.');
+    });
+}
+
+function selectFolder(folder) {
+    currentFolder = folder;
+    document.querySelectorAll('.folder-item').forEach(item => {
+        item.classList.remove('active');
+    });
+    const activeItem = document.querySelector(`[data-folder="${folder}"]`);
+    if (activeItem) activeItem.classList.add('active');
+    applyFilters();
+}
+
+function updateFolderCounts() {
+    document.getElementById('allDocsCount').textContent = allDocuments.length;
+    document.getElementById('uncategorizedCount').textContent = allDocuments.filter(doc => !doc.folder || doc.folder === 'uncategorized').length;
+
+    folders.forEach(folder => {
+        if (folder !== 'all' && folder !== 'uncategorized') {
+            const count = allDocuments.filter(doc => doc.folder === folder).length;
+            const countElement = document.querySelector(`[data-folder="${folder}"] .folder-count`);
+            if (countElement) countElement.textContent = count;
+        }
+    });
+}
+
 </script>
 {% endblock %}

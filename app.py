@@ -164,8 +164,17 @@ def index():
 @app.route('/upload')
 @upload_required
 def upload_page():
-    """Page for uploading and indexing PDFs"""
-    return render_template('upload.html')
+    """Page for uploading and indexing PDFs with folder/category support"""
+    os.makedirs(PDF_DIR, exist_ok=True)
+    folders = []
+    for folder in os.listdir(PDF_DIR):
+        full_path = os.path.join(PDF_DIR, folder)
+        if os.path.isdir(full_path):
+            folders.append(folder)
+    if 'uncategorized' not in folders:
+        folders.insert(0, 'uncategorized')
+    return render_template('upload.html', folders=folders)
+
 
 @app.route('/search')
 @search_required
@@ -185,57 +194,58 @@ def users_page():
     """Page for managing users (admin only)"""
     return render_template('users.html')
 
-# API Routes
+
+
 @app.route("/api/upload", methods=["POST"])
 @upload_required
 def upload_api():
-    """API endpoint for uploading and indexing PDFs"""
     if 'pdfs' not in request.files:
         return jsonify({"error": "No files uploaded under 'pdfs' field."}), 400
 
     files = request.files.getlist("pdfs")
-    category = request.form.get('category', 'Uncategorized')
-
     if not files:
         return jsonify({"error": "No files received."}), 400
 
-    # Clear previous progress updates
+    # Get category from either dropdown or custom text input
+    category = request.form.get('new_folder') or request.form.get('category') or 'Uncategorized'
+    
+    # Create folder on disk
+    folder_path = os.path.join(PDF_DIR, category)
+    os.makedirs(folder_path, exist_ok=True)
+
+    indexed_files = []
     global progress_updates
     progress_updates = []
 
-    indexed_files = []
     total_start = time.time()
 
     for file in files:
         filename = secure_filename(file.filename)
-        save_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        save_path = os.path.join(folder_path, filename)
         file.save(save_path)
 
         doc_id = os.path.splitext(filename)[0]
         progress_updates.append(f"Starting indexing: {doc_id} (Category: {category})")
-        logging.info(f"Starting indexing for {doc_id} with category: {category}")
+        logging.info(f"Starting indexing for {doc_id} in category {category}")
 
-        start_time = time.time()
-        
-        # Pass a callback for progress updates
-        def progress_callback(message):
-            progress_updates.append(message)
-            logging.info(message)
-        
-        # Pass category and callback to index_pdf function
+        def progress_callback(msg):
+            progress_updates.append(msg)
+            logging.info(msg)
+
         index_pdf(save_path, category=category, progress_callback=progress_callback)
-        end_time = time.time()
 
         indexed_files.append(doc_id)
-        progress_updates.append(f"Finished indexing: {doc_id} in {end_time - start_time:.2f} sec")
-        logging.info(f"Finished indexing {doc_id} in {end_time - start_time:.2f} seconds")
+        progress_updates.append(f"Finished indexing: {doc_id}")
 
     total_time = time.time() - total_start
-    logging.info(f"Total indexing time for {len(indexed_files)} PDFs: {total_time:.2f} seconds")
+    logging.info(f"Indexed {len(indexed_files)} PDF(s) in {total_time:.2f} sec")
+
     return jsonify({
-        "message": f"Indexed {len(indexed_files)} PDF(s) in category '{category}': {', '.join(indexed_files)}",
-        "category": category
+        "message": f"Indexed {len(indexed_files)} PDF(s) in category '{category}'",
+        "category": category,
+        "files": indexed_files
     })
+
 
 @app.route('/api/progress')
 def progress_stream():
@@ -349,8 +359,18 @@ def delete_document():
             return jsonify({"error": f"Error deleting from vector store: {str(delete_error)}"}), 500
 
         # Also delete the PDF file if it exists
+        
         try:
-            pdf_path = os.path.join(PDF_DIR, f"{doc_id}.pdf")
+            pdf_path = None
+            for root, dirs, files in os.walk(PDF_DIR):
+                for f in files:
+                    if f.startswith(doc_id):  
+                        pdf_path = os.path.join(root, f)
+                    break
+                if pdf_path:
+                    break
+
+        
             if os.path.exists(pdf_path):
                 os.remove(pdf_path)
                 logging.info(f"Deleted PDF file: {pdf_path}")
@@ -383,35 +403,72 @@ def delete_document():
 
 @app.route("/api/reindex-document", methods=["POST"])
 @manage_required
-def reindex_document_api():
-    """API endpoint to re-index a document"""
+# def reindex_document_api():
+#     """API endpoint to re-index a document"""
+#     try:
+#         data = request.get_json()
+#         doc_id = data.get("doc_id")
+
+#         logging.info(f"Attempting to re-index document: {doc_id}")
+
+#         if not doc_id:
+#             logging.warning("Re-index request missing document ID")
+#             return jsonify({"error": "Document ID is required"}), 400
+
+#         # Re-index the document
+#         result = reindex_document(doc_id)
+
+#         if result.get('success'):
+#             logging.info(f"Successfully re-indexed document: {doc_id}")
+#             return jsonify({
+#                 "success": True,
+#                 "message": result.get('message'),
+#                 "chunks_created": result.get('chunks_created', 0)
+#             })
+#         else:
+#             logging.error(f"Failed to re-index document {doc_id}: {result.get('error')}")
+#             return jsonify({"error": result.get('error')}), 500
+
+#     except Exception as e:
+#         logging.error(f"Error in re-index API: {e}")
+#         return jsonify({"error": f"Internal server error: {str(e)}"}), 500
+
+
+def reindex_document(doc_id):
+    from core.indexer import build_knowledge_base_optimized
+    from chromadb import PersistentClient
+
+    client = PersistentClient(path=os.path.join("data", "vector_store"))
+    collection = client.get_or_create_collection("pdf_docs")
+
+
+    collection = get_chroma_collection()
+
     try:
-        data = request.get_json()
-        doc_id = data.get("doc_id")
+        doc_meta = collection.get(where={"doc_id": doc_id})
+        if not doc_meta or not doc_meta.get("metadatas"):
+            return {"success": False, "error": f"No metadata found for {doc_id}"}
 
-        logging.info(f"Attempting to re-index document: {doc_id}")
+        # Use first metadata entry (we assume consistent folder info across chunks)
+        meta = doc_meta["metadatas"][0]
+        folder = meta.get("folder", "uncategorized")
+        filename = f"{doc_id}.pdf"
 
-        if not doc_id:
-            logging.warning("Re-index request missing document ID")
-            return jsonify({"error": "Document ID is required"}), 400
+        pdf_path = os.path.join(PDF_DIR, folder, filename)
+        if not os.path.exists(pdf_path):
+            return {"success": False, "error": f"File not found: {pdf_path}"}
 
-        # Re-index the document
-        result = reindex_document(doc_id)
-
-        if result.get('success'):
-            logging.info(f"Successfully re-indexed document: {doc_id}")
-            return jsonify({
-                "success": True,
-                "message": result.get('message'),
-                "chunks_created": result.get('chunks_created', 0)
-            })
-        else:
-            logging.error(f"Failed to re-index document {doc_id}: {result.get('error')}")
-            return jsonify({"error": result.get('error')}), 500
+        result = build_knowledge_base_optimized(pdf_path, category=folder)
+        return {
+            "success": True,
+            "message": f"Reindexed {doc_id} in folder '{folder}'",
+            "chunks_created": result.get("chunks_added", 0)
+        }
 
     except Exception as e:
-        logging.error(f"Error in re-index API: {e}")
-        return jsonify({"error": f"Internal server error: {str(e)}"}), 500
+        logging.error(f"Error in reindex_document: {e}")
+        return {"success": False, "error": str(e)}
+
 
 @app.route("/api/users")
 @admin_required
@@ -613,6 +670,85 @@ def create_user():
     except Exception as e:
         logging.error(f"Error creating user: {e}")
         db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/folders", methods=["GET"])
+@login_required
+def list_folders():
+    try:
+        collection = get_chroma_collection()
+        all_data = collection.get(include=["metadatas"])
+
+        folders = set()
+        for meta in all_data.get("metadatas", []):
+            folder = meta.get("folder", "uncategorized")
+            folders.add(folder)
+
+        return jsonify(sorted(folders))
+    except Exception as e:
+        logging.error(f"Failed to list folders: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/folders", methods=["POST"])
+@manage_required
+def create_folder():
+    data = request.get_json()
+    folder_name = data.get("name")
+
+    if not folder_name:
+        return jsonify({"error": "Folder name is required"}), 400
+
+    folder_path = os.path.join(PDF_DIR, folder_name)
+    try:
+        os.makedirs(folder_path, exist_ok=False)
+        return jsonify({"success": True, "message": f"Folder '{folder_name}' created"})
+    except FileExistsError:
+        return jsonify({"error": "Folder already exists"}), 400
+    except Exception as e:
+        logging.error(f"Error creating folder: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/move-document", methods=["POST"])
+@manage_required
+def move_document():
+    data = request.get_json()
+    doc_id = data.get("doc_id")
+    new_folder = data.get("new_folder")
+
+    if not doc_id or not new_folder:
+        return jsonify({"error": "Document ID and new folder are required"}), 400
+
+    try:
+        collection = get_chroma_collection()
+        doc_data = collection.get(where={"doc_id": doc_id}, include=["ids", "documents", "metadatas", "embeddings"])
+
+        if not doc_data or not doc_data.get("ids"):
+            return jsonify({"error": "Document not found in vector store"}), 404
+
+        # Prepare updated chunks
+        updated_chunks = []
+        for i, meta in enumerate(doc_data["metadatas"]):
+            updated_chunks.append({
+                "text": doc_data["documents"][i],
+                "embedding": doc_data["embeddings"][i],
+                "page_num": meta.get("page_num", 0),
+                "chunk_index": meta.get("chunk_index", 0),
+                "folder": new_folder
+            })
+
+        # Delete original
+        collection.delete(ids=doc_data["ids"])
+
+        # Add updated
+        from core.indexer import add_chunks_to_db
+        add_chunks_to_db(updated_chunks, doc_id, category=new_folder, progress_callback=None)
+
+        return jsonify({"success": True, "message": f"Document '{doc_id}' moved to folder '{new_folder}'"})
+    except Exception as e:
+        logging.error(f"Error moving document: {e}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":

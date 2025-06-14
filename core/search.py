@@ -472,7 +472,6 @@ def get_document_stats():
             'doc_count': 0,
             'chunk_count': 0
         }
-
 def get_document_list():
     """
     Get list of all indexed documents with detailed metadata.
@@ -495,39 +494,29 @@ def get_document_list():
         try:
             # Get all metadatas and IDs
             all_data = collection.get()
-
             if not all_data or 'metadatas' not in all_data or not all_data['metadatas']:
                 return []
 
-            # Group data by document
+            # Group data by document ID
             documents = {}
             for i, meta in enumerate(all_data['metadatas']):
-                if 'doc_id' in meta:
-                    doc_id = meta['doc_id']
-                    if doc_id not in documents:
-                        documents[doc_id] = {
-                            'doc_id': doc_id,
-                            'chunk_count': 0,
-                            'upload_date': None,
-                            'file_size': None,
-                            'page_count': None,
-                            'category': meta.get('category', 'Uncategorized'),
-                            'folder': meta.get('folder', 'uncategorized'),
-                            'tags': meta.get('tags', []),
-                            'last_updated': None
-                        }
+                doc_id = meta.get('doc_id')
+                if not doc_id:
+                    continue
 
-                    # Increment chunk count
-                    documents[doc_id]['chunk_count'] += 1
+                if doc_id not in documents:
+                    documents[doc_id] = {
+                        'doc_id': doc_id,
+                        'chunk_count': 0,
+                        'upload_date': meta.get('upload_date'),
+                        'file_size': meta.get('file_size'),
+                        'page_count': meta.get('page_count'),
+                        'category': meta.get('category') or 'Uncategorized',
+                        'tags': meta.get('tags', []),
+                        'last_updated': meta.get('last_updated', meta.get('upload_date'))
+                    }
 
-                    # Extract metadata (use the first occurrence for document-level metadata)
-                    if documents[doc_id]['upload_date'] is None:
-                        documents[doc_id]['upload_date'] = meta.get('upload_date')
-                        documents[doc_id]['file_size'] = meta.get('file_size')
-                        documents[doc_id]['page_count'] = meta.get('page_count')
-                        documents[doc_id]['last_updated'] = meta.get('last_updated', meta.get('upload_date'))
-                        documents[doc_id]['category'] = meta.get('category', 'Uncategorized')
-                        documents[doc_id]['folder'] = meta.get('folder', 'uncategorized')
+                documents[doc_id]['chunk_count'] += 1
 
             # Convert to list and sort by upload date (newest first)
             doc_list = list(documents.values())
@@ -541,6 +530,76 @@ def get_document_list():
     except Exception as e:
         logging.error(f"Error getting document list: {e}")
         return []
+
+
+# def get_document_list():
+#     """
+#     Get list of all indexed documents with detailed metadata.
+
+#     Returns:
+#         list: List of document dictionaries with metadata
+#     """
+#     try:
+#         collection = get_chroma_collection()
+
+#         # First check if we can get the count
+#         try:
+#             count = collection.count()
+#             if count == 0:
+#                 return []
+#         except Exception as e:
+#             logging.warning(f"Error getting collection count: {e}")
+#             return []
+
+#         try:
+#             # Get all metadatas and IDs
+#             all_data = collection.get()
+
+#             if not all_data or 'metadatas' not in all_data or not all_data['metadatas']:
+#                 return []
+
+#             # Group data by document
+#             documents = {}
+#             for i, meta in enumerate(all_data['metadatas']):
+#                 if 'doc_id' in meta:
+#                     doc_id = meta['doc_id']
+#                     if doc_id not in documents:
+#                         documents[doc_id] = {
+#                             'doc_id': doc_id,
+#                             'chunk_count': 0,
+#                             'upload_date': None,
+#                             'file_size': None,
+#                             'page_count': None,
+#                             'category': meta.get('category', 'Uncategorized'),
+#                             'folder': meta.get('folder', 'uncategorized'),
+#                             'tags': meta.get('tags', []),
+#                             'last_updated': None
+#                         }
+
+#                     # Increment chunk count
+#                     documents[doc_id]['chunk_count'] += 1
+
+#                     # Extract metadata (use the first occurrence for document-level metadata)
+#                     if documents[doc_id]['upload_date'] is None:
+#                         documents[doc_id]['upload_date'] = meta.get('upload_date')
+#                         documents[doc_id]['file_size'] = meta.get('file_size')
+#                         documents[doc_id]['page_count'] = meta.get('page_count')
+#                         documents[doc_id]['last_updated'] = meta.get('last_updated', meta.get('upload_date'))
+#                         documents[doc_id]['category'] = meta.get('category', 'Uncategorized')
+#                         documents[doc_id]['folder'] = meta.get('folder', 'uncategorized')
+
+#             # Convert to list and sort by upload date (newest first)
+#             doc_list = list(documents.values())
+#             doc_list.sort(key=lambda x: x.get('upload_date') or '1970-01-01', reverse=True)
+
+#             return doc_list
+#         except Exception as e:
+#             logging.warning(f"Error getting collection data: {e}")
+#             return []
+
+#     except Exception as e:
+#         logging.error(f"Error getting document list: {e}")
+#         return []
 
 def reindex_document(doc_id):
     """

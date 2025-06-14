@@ -148,19 +148,13 @@
                             <div class="row">
                                 <div class="col-md-6">
                                     <label for="categorySelect" class="form-label">Select Category</label>
-                                    <select class="form-select" id="categorySelect">
-                                        <option value="Uncategorized">Uncategorized</option>
-                                        <option value="Research">Research</option>
-                                        <option value="Reports">Reports</option>
-                                        <option value="Documentation">Documentation</option>
-                                        <option value="Legal">Legal</option>
-                                        <option value="Financial">Financial</option>
-                                        <option value="Academic">Academic</option>
-                                        <option value="Technical">Technical</option>
-                                        <option value="Marketing">Marketing</option>
-                                        <option value="Training">Training</option>
-                                        <option value="Other">Other</option>
+                                   <select class="form-select" id="categorySelect">
+                                        {% for folder in folders %}
+                                        <option value="{{ folder }}">{{ folder }}</option>
+                                        {% endfor %}
                                     </select>
+
+
                                 </div>
                                 <div class="col-md-6">
                                     <label for="customCategory" class="form-label">Or Create New Category</label>
