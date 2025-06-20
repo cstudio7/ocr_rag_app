@@ -81,7 +81,7 @@ def correct_spelling(text):
         'has_corrections': has_corrections
     }
 
-def query_knowledge_base(query_text, top_k=SEARCH_TOP_K, threshold=SEARCH_THRESHOLD):
+def query_knowledge_base(query_text, top_k=SEARCH_TOP_K, threshold=SEARCH_THRESHOLD, include_keywords=True):
     """
     Searches the vector store for semantically similar chunks.
 
@@ -89,6 +89,7 @@ def query_knowledge_base(query_text, top_k=SEARCH_TOP_K, threshold=SEARCH_THRESH
         query_text (str): The query text to search for
         top_k (int): Number of results to return
         threshold (float): Minimum similarity score (0-100) to include in results
+        include_keywords (bool): Whether to include keyword search results
 
     Returns:
         Dict: Dictionary with query, results, and metadata
@@ -127,64 +128,116 @@ def query_knowledge_base(query_text, top_k=SEARCH_TOP_K, threshold=SEARCH_THRESH
         except Exception as e:
             logging.warning(f"Error checking collection count: {e}")
 
+        # ALWAYS do semantic search, but only do keyword search if include_keywords is True
+        semantic_results = []
+        keyword_results = []
+        
+        # 1. Semantic search
         try:
-            # Query the collection
             results = collection.query(
                 query_texts=[query_text],
                 n_results=top_k,
                 include=["documents", "metadatas", "distances"]
             )
+            
+            if results and 'documents' in results and results['documents']:
+                documents = results['documents'][0]
+                metadatas = results['metadatas'][0]
+                distances = results['distances'][0]
+
+                for i, (doc, meta, dist) in enumerate(zip(documents, metadatas, distances)):
+                    similarity = max(0, min(100, (1 - dist) * 100))
+                    if similarity >= threshold:
+                        semantic_results.append({
+                            'document': meta.get('doc_id', 'unknown'),
+                            'page': meta.get('page_num', 0),
+                            'text': doc,
+                            'similarity': round(similarity, 2),
+                            'source': 'semantic'
+                        })
         except Exception as e:
-            logging.error(f"Error during query: {e}")
-            # This might happen if the collection was created without an embedding function
-            return {
-                'query': original_query,
-                'corrected_query': corrected_query if has_corrections else None,
-                'corrections': corrections_made if has_corrections else [],
-                'has_corrections': has_corrections,
-                'results': [],
-                'total_results': 0,
-                'error': "Search functionality is not available. Please index documents first."
-            }
-
-        # Process results
-        processed_results = []
-
-        if results and 'documents' in results and results['documents']:
-            documents = results['documents'][0]  # First query results
-            metadatas = results['metadatas'][0]
-            distances = results['distances'][0]
-
-            for i, (doc, meta, dist) in enumerate(zip(documents, metadatas, distances)):
-                # Convert distance to similarity score (0-100%)
-                similarity = max(0, min(100, (1 - dist) * 100))
-
-                # Skip results below threshold
-                if similarity < threshold:
-                    continue
-
-                # Get document info
-                doc_id = meta.get('doc_id', 'unknown')
-                page_num = meta.get('page_num', 0)
-
-                processed_results.append({
-                    'document': doc_id,
-                    'page': page_num,
-                    'text': doc,
-                    'similarity': round(similarity, 2)
-                })
-
+            logging.error(f"Error during semantic search: {e}")
+        
+        # 2. Keyword search (only if include_keywords is True)
+        if include_keywords:
+            logging.info("Running keyword search as well")
+            try:
+                # Get all documents (with pagination if needed)
+                all_docs = []
+                all_metadatas = []
+                
+                # Get documents in batches to handle large collections
+                batch_size = 1000
+                offset = 0
+                
+                while True:
+                    batch = collection.get(limit=batch_size, offset=offset)
+                    if not batch or not batch['documents'] or len(batch['documents']) == 0:
+                        break
+                        
+                    all_docs.extend(batch['documents'])
+                    all_metadatas.extend(batch['metadatas'])
+                    offset += len(batch['documents'])
+                    
+                    # Safety check to prevent infinite loops
+                    if offset > 10000:  # Arbitrary limit
+                        break
+                
+                # Manual search through documents
+                for doc, meta in zip(all_docs, all_metadatas):
+                    doc_lower = doc.lower()
+                    term_lower = query_text.lower()
+                    
+                    # Check if the document contains the search term
+                    if term_lower in doc_lower:
+                        # Calculate a simple relevance score based on term frequency
+                        term_count = doc_lower.count(term_lower)
+                        doc_length = len(doc_lower)
+                        frequency = term_count / max(1, doc_length)
+                        similarity = min(100, max(50, frequency * 10000))  # Scale to reasonable range
+                        
+                        keyword_results.append({
+                            'document': meta.get('doc_id', 'unknown'),
+                            'page': meta.get('page_num', 0),
+                            'text': doc,
+                            'similarity': round(similarity, 2),
+                            'source': 'keyword'
+                        })
+            except Exception as e:
+                logging.error(f"Error during keyword search: {e}")
+        
+        # Combine and deduplicate results
+        all_results = semantic_results + keyword_results
+        
+        # Sort by similarity score (descending)
+        all_results.sort(key=lambda x: x['similarity'], reverse=True)
+        
+        # Deduplicate based on text content
+        seen_texts = set()
+        final_results = []
+        
+        for result in all_results:
+            # Use a hash of the text as a unique identifier
+            text_hash = hash(result['text'])
+            if text_hash not in seen_texts:
+                seen_texts.add(text_hash)
+                final_results.append(result)
+                
+                # Limit to top_k results
+                if len(final_results) >= top_k:
+                    break
+        
         end_time = time.time()
         logging.info(f"Search completed in {round(end_time - start_time, 3)} seconds")
-        logging.info(f"Found {len(processed_results)} results")
+        logging.info(f"Found {len(final_results)} results (semantic: {len(semantic_results)}, keyword: {len(keyword_results)})")
 
         return {
             'query': original_query,
             'corrected_query': corrected_query if has_corrections else None,
             'corrections': corrections_made if has_corrections else [],
             'has_corrections': has_corrections,
-            'results': processed_results,
-            'total_results': len(processed_results),
+            'results': final_results,
+            'total_results': len(final_results),
             'search_time': round(end_time - start_time, 3)
         }
 
@@ -199,10 +252,13 @@ def query_knowledge_base(query_text, top_k=SEARCH_TOP_K, threshold=SEARCH_THRESH
             'total_results': 0,
             'error': str(e)
         }
+    
+
 
 def query_knowledge_base_no_correction(query_text, top_k=SEARCH_TOP_K, threshold=SEARCH_THRESHOLD):
     """
     Searches the vector store for semantically similar chunks without spell correction.
+    Falls back to exact match if semantic results are insufficient.
 
     Args:
         query_text (str): The query text to search for
@@ -212,6 +268,7 @@ def query_knowledge_base_no_correction(query_text, top_k=SEARCH_TOP_K, threshold
     Returns:
         Dict: Dictionary with query, results, and metadata
     """
+    import time
     start_time = time.time()
     logging.info(f"Searching for (no correction): {query_text}")
 
@@ -235,69 +292,139 @@ def query_knowledge_base_no_correction(query_text, top_k=SEARCH_TOP_K, threshold
         except Exception as e:
             logging.warning(f"Error checking collection count: {e}")
 
+        # ALWAYS do both semantic search and keyword search
+        semantic_results = []
+        keyword_results = []
+        
+        # 1. Semantic search
         try:
-            # Query the collection
             results = collection.query(
                 query_texts=[query_text],
                 n_results=top_k,
                 include=["documents", "metadatas", "distances"]
             )
+            
+            if results and 'documents' in results and results['documents']:
+                documents = results['documents'][0]
+                metadatas = results['metadatas'][0]
+                distances = results['distances'][0]
+
+                for i, (doc, meta, dist) in enumerate(zip(documents, metadatas, distances)):
+                    similarity = max(0, min(100, (1 - dist) * 100))
+                    if similarity >= threshold:
+                        semantic_results.append({
+                            'document': meta.get('doc_id', 'unknown'),
+                            'page': meta.get('page_num', 0),
+                            'text': doc,
+                            'similarity': round(similarity, 2),
+                            'source': 'semantic'
+                        })
         except Exception as e:
-            logging.error(f"Error during query: {e}")
-            # This might happen if the collection was created without an embedding function
-            return {
-                'query': query_text,
-                'corrected_query': None,
-                'corrections': [],
-                'has_corrections': False,
-                'results': [],
-                'total_results': 0,
-                'error': "Search functionality is not available. Please index documents first."
-            }
-
-        # Process results
-        processed_results = []
-
-        if results and 'documents' in results and results['documents']:
-            documents = results['documents'][0]  # First query results
-            metadatas = results['metadatas'][0]
-            distances = results['distances'][0]
-
-            for i, (doc, meta, dist) in enumerate(zip(documents, metadatas, distances)):
-                # Convert distance to similarity score (0-100%)
-                similarity = max(0, min(100, (1 - dist) * 100))
-
-                # Skip results below threshold
-                if similarity < threshold:
-                    continue
-
-                # Get document info
-                doc_id = meta.get('doc_id', 'unknown')
-                page_num = meta.get('page_num', 0)
-
-                processed_results.append({
-                    'document': doc_id,
-                    'page': page_num,
-                    'text': doc,
-                    'similarity': round(similarity, 2)
-                })
+            logging.error(f"Error during semantic search: {e}")
+        
+        # 2. Keyword search (always run this)
+        logging.info("Running keyword search as well (no correction)")
+        try:
+            # Get all documents (with pagination if needed)
+            all_docs = []
+            all_metadatas = []
+            
+            # Get documents in batches to handle large collections
+            batch_size = 1000
+            offset = 0
+            
+            while True:
+                batch = collection.get(limit=batch_size, offset=offset)
+                if not batch or not batch['documents'] or len(batch['documents']) == 0:
+                    break
+                    
+                all_docs.extend(batch['documents'])
+                all_metadatas.extend(batch['metadatas'])
+                offset += len(batch['documents'])
+                
+                # Safety check to prevent infinite loops
+                if offset > 10000:  # Arbitrary limit
+                    break
+            
+            # Manual search through documents
+            for doc, meta in zip(all_docs, all_metadatas):
+                doc_lower = doc.lower()
+                term_lower = query_text.lower()
+                
+                # Check for exact match or word boundary match
+                if term_lower in doc_lower:
+                    # Check if it's a word boundary match
+                    is_word = False
+                    
+                    # Simple word boundary check
+                    term_pos = doc_lower.find(term_lower)
+                    before_char = ' ' if term_pos == 0 else doc_lower[term_pos-1]
+                    after_pos = term_pos + len(term_lower)
+                    after_char = ' ' if after_pos >= len(doc_lower) else doc_lower[after_pos]
+                    
+                    # Check if term is surrounded by spaces or punctuation
+                    if (before_char.isspace() or not before_char.isalnum()) and \
+                       (after_char.isspace() or not after_char.isalnum()):
+                        is_word = True
+                    
+                    # Add to results with appropriate score
+                    similarity = 100.0 if is_word else 80.0
+                    
+                    keyword_results.append({
+                        'document': meta.get('doc_id', 'unknown'),
+                        'page': meta.get('page_num', 0),
+                        'text': doc,
+                        'similarity': similarity,
+                        'source': 'keyword'
+                    })
+        except Exception as e:
+            logging.error(f"Error during keyword search: {e}")
+        
+        # 3. Combine results, removing duplicates
+        all_results = []
+        seen_texts = set()
+        
+        # First add semantic results
+        for result in semantic_results:
+            text_hash = hash(result['text'])
+            if text_hash not in seen_texts:
+                all_results.append(result)
+                seen_texts.add(text_hash)
+        
+        # Then add keyword results if not already included
+        for result in keyword_results:
+            text_hash = hash(result['text'])
+            if text_hash not in seen_texts:
+                all_results.append(result)
+                seen_texts.add(text_hash)
+        
+        # Sort by similarity (descending)
+        all_results.sort(key=lambda x: x['similarity'], reverse=True)
+        
+        # Limit to top_k
+        final_results = all_results[:top_k]
+        
+        # Remove the 'source' field before returning
+        for result in final_results:
+            if 'source' in result:
+                del result['source']
 
         end_time = time.time()
         logging.info(f"Search completed in {round(end_time - start_time, 3)} seconds")
-        logging.info(f"Found {len(processed_results)} results")
+        logging.info(f"Found {len(final_results)} results (semantic: {len(semantic_results)}, keyword: {len(keyword_results)})")
 
         return {
             'query': query_text,
             'corrected_query': None,
             'corrections': [],
             'has_corrections': False,
-            'results': processed_results,
-            'total_results': len(processed_results),
+            'results': final_results,
+            'total_results': len(final_results),
             'search_time': round(end_time - start_time, 3)
         }
 
     except Exception as e:
-        logging.error(f"Error searching knowledge base: {e}")
+        logging.error(f"Error in query_knowledge_base_no_correction: {e}")
         return {
             'query': query_text,
             'corrected_query': None,
@@ -472,12 +599,13 @@ def get_document_stats():
             'doc_count': 0,
             'chunk_count': 0
         }
+
 def get_document_list():
     """
-    Get list of all indexed documents with detailed metadata.
+    Get list of all indexed documents with their chunk counts.
 
     Returns:
-        list: List of document dictionaries with metadata
+        List[Tuple]: List of (doc_id, chunk_count) tuples
     """
     try:
         collection = get_chroma_collection()
@@ -492,37 +620,21 @@ def get_document_list():
             return []
 
         try:
-            # Get all metadatas and IDs
+            # Get all metadatas
             all_data = collection.get()
+
             if not all_data or 'metadatas' not in all_data or not all_data['metadatas']:
                 return []
 
-            # Group data by document ID
-            documents = {}
-            for i, meta in enumerate(all_data['metadatas']):
-                doc_id = meta.get('doc_id')
-                if not doc_id:
-                    continue
+            # Count chunks per document
+            doc_counts = {}
+            for meta in all_data['metadatas']:
+                if 'doc_id' in meta:
+                    doc_id = meta['doc_id']
+                    doc_counts[doc_id] = doc_counts.get(doc_id, 0) + 1
 
-                if doc_id not in documents:
-                    documents[doc_id] = {
-                        'doc_id': doc_id,
-                        'chunk_count': 0,
-                        'upload_date': meta.get('upload_date'),
-                        'file_size': meta.get('file_size'),
-                        'page_count': meta.get('page_count'),
-                        'category': meta.get('category') or 'Uncategorized',
-                        'tags': meta.get('tags', []),
-                        'last_updated': meta.get('last_updated', meta.get('upload_date'))
-                    }
-
-                documents[doc_id]['chunk_count'] += 1
-
-            # Convert to list and sort by upload date (newest first)
-            doc_list = list(documents.values())
-            doc_list.sort(key=lambda x: x.get('upload_date') or '1970-01-01', reverse=True)
-
-            return doc_list
+            # Convert to list of tuples for JSON serialization
+            return list(doc_counts.items())
         except Exception as e:
             logging.warning(f"Error getting collection data: {e}")
             return []
@@ -531,135 +643,85 @@ def get_document_list():
         logging.error(f"Error getting document list: {e}")
         return []
 
-
-# def get_document_list():
-#     """
-#     Get list of all indexed documents with detailed metadata.
-
-#     Returns:
-#         list: List of document dictionaries with metadata
-#     """
-#     try:
-#         collection = get_chroma_collection()
-
-#         # First check if we can get the count
-#         try:
-#             count = collection.count()
-#             if count == 0:
-#                 return []
-#         except Exception as e:
-#             logging.warning(f"Error getting collection count: {e}")
-#             return []
-
-#         try:
-#             # Get all metadatas and IDs
-#             all_data = collection.get()
-
-#             if not all_data or 'metadatas' not in all_data or not all_data['metadatas']:
-#                 return []
-
-#             # Group data by document
-#             documents = {}
-#             for i, meta in enumerate(all_data['metadatas']):
-#                 if 'doc_id' in meta:
-#                     doc_id = meta['doc_id']
-#                     if doc_id not in documents:
-#                         documents[doc_id] = {
-#                             'doc_id': doc_id,
-#                             'chunk_count': 0,
-#                             'upload_date': None,
-#                             'file_size': None,
-#                             'page_count': None,
-#                             'category': meta.get('category', 'Uncategorized'),
-#                             'folder': meta.get('folder', 'uncategorized'),
-#                             'tags': meta.get('tags', []),
-#                             'last_updated': None
-#                         }
-
-#                     # Increment chunk count
-#                     documents[doc_id]['chunk_count'] += 1
-
-#                     # Extract metadata (use the first occurrence for document-level metadata)
-#                     if documents[doc_id]['upload_date'] is None:
-#                         documents[doc_id]['upload_date'] = meta.get('upload_date')
-#                         documents[doc_id]['file_size'] = meta.get('file_size')
-#                         documents[doc_id]['page_count'] = meta.get('page_count')
-#                         documents[doc_id]['last_updated'] = meta.get('last_updated', meta.get('upload_date'))
-#                         documents[doc_id]['category'] = meta.get('category', 'Uncategorized')
-#                         documents[doc_id]['folder'] = meta.get('folder', 'uncategorized')
-
-#             # Convert to list and sort by upload date (newest first)
-#             doc_list = list(documents.values())
-#             doc_list.sort(key=lambda x: x.get('upload_date') or '1970-01-01', reverse=True)
-
-#             return doc_list
-#         except Exception as e:
-#             logging.warning(f"Error getting collection data: {e}")
-#             return []
-
-#     except Exception as e:
-#         logging.error(f"Error getting document list: {e}")
-#         return []
-
-def reindex_document(doc_id):
+def enhanced_search(query_text, top_k=10):
     """
-    Re-index a specific document by removing it and re-processing the PDF file.
-
+    Enhanced search function that combines semantic search with keyword matching.
+    
     Args:
-        doc_id (str): Document ID to re-index
-
+        query_text: The search query
+        top_k: Number of results to return
+        
     Returns:
-        dict: Result of re-indexing operation
+        Dict: Search results
     """
+    collection = get_chroma_collection()
+    
+    # 1. Try semantic search first
+    semantic_results = collection.query(
+        query_texts=[query_text],
+        n_results=top_k
+    )
+    
+    # 2. Try keyword search
     try:
-        import os
-        from .indexer import index_pdf
-        from config import PDF_DIR
-
-        # Check if PDF file exists
-        pdf_path = os.path.join(PDF_DIR, doc_id)
-        if not os.path.exists(pdf_path):
-            return {
-                'success': False,
-                'error': f'PDF file not found: {doc_id}'
+        # First try exact match
+        keyword_results = collection.get(
+            where={"$contains": query_text},
+            limit=top_k
+        )
+    except Exception:
+        # If that fails, try a more basic approach
+        keyword_results = {"ids": [], "documents": [], "metadatas": []}
+        all_docs = collection.get()
+        
+        # Manual search through documents
+        for i, doc in enumerate(all_docs["documents"]):
+            if query_text.lower() in doc.lower():
+                keyword_results["ids"].append(all_docs["ids"][i])
+                keyword_results["documents"].append(doc)
+                keyword_results["metadatas"].append(all_docs["metadatas"][i])
+                
+                if len(keyword_results["ids"]) >= top_k:
+                    break
+    
+    # 3. Combine results (avoiding duplicates)
+    combined_results = {
+        "ids": semantic_results["ids"][0][:],
+        "documents": semantic_results["documents"][0][:],
+        "metadatas": semantic_results["metadatas"][0][:],
+        "distances": semantic_results.get("distances", [[]])[0][:]
+    }
+    
+    seen_ids = set(combined_results["ids"])
+    
+    for i, doc_id in enumerate(keyword_results.get("ids", [])):
+        if doc_id not in seen_ids and i < len(keyword_results.get("documents", [])):
+            combined_results["ids"].append(doc_id)
+            combined_results["documents"].append(keyword_results["documents"][i])
+            combined_results["metadatas"].append(keyword_results["metadatas"][i])
+            # Add a placeholder distance
+            if "distances" in combined_results:
+                combined_results["distances"].append(1.0)
+            seen_ids.add(doc_id)
+    
+    # 4. Format results for the frontend
+    formatted_results = {
+        "query": query_text,
+        "corrected_query": query_text,  # No correction in this function
+        "has_corrections": False,
+        "results": [],
+        "total_results": len(combined_results["ids"])
+    }
+    
+    for i, doc_id in enumerate(combined_results["ids"]):
+        if i < len(combined_results["documents"]):
+            result = {
+                "document_id": combined_results["metadatas"][i].get("doc_id", "unknown"),
+                "page_num": combined_results["metadatas"][i].get("page_num", 0),
+                "chunk_index": combined_results["metadatas"][i].get("chunk_index", 0),
+                "text": combined_results["documents"][i],
+                "relevance": 100 - int(combined_results.get("distances", [0])[i] * 100) if i < len(combined_results.get("distances", [])) else 50
             }
-
-        # Get collection
-        collection = get_chroma_collection()
-
-        # Delete existing document chunks
-        try:
-            doc_chunks = collection.get(where={"doc_id": doc_id})
-            if doc_chunks and 'ids' in doc_chunks and doc_chunks['ids']:
-                collection.delete(ids=doc_chunks['ids'])
-                logging.info(f"Deleted {len(doc_chunks['ids'])} existing chunks for {doc_id}")
-        except Exception as delete_error:
-            logging.warning(f"Error deleting existing chunks for {doc_id}: {delete_error}")
-
-        # Re-index the document
-        try:
-            result = index_pdf(pdf_path)
-            if result.get('success'):
-                return {
-                    'success': True,
-                    'message': f'Successfully re-indexed {doc_id}',
-                    'chunks_created': result.get('chunks_created', 0)
-                }
-            else:
-                return {
-                    'success': False,
-                    'error': f'Failed to re-index {doc_id}: {result.get("error", "Unknown error")}'
-                }
-        except Exception as index_error:
-            logging.error(f"Error re-indexing {doc_id}: {index_error}")
-            return {
-                'success': False,
-                'error': f'Error re-indexing {doc_id}: {str(index_error)}'
-            }
-
-    except Exception as e:
-        logging.error(f"Error in reindex_document: {e}")
-        return {
-            'success': False,
-            'error': f'Error re-indexing document: {str(e)}'
-        }
+            formatted_results["results"].append(result)
+    
+    return formatted_results

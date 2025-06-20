@@ -57,7 +57,16 @@ COLLECTION_NAME = "documents"
 # OCR configuration
 OCR_LANGUAGE = "eng"
 OCR_DPI = 200  # Lower for faster processing, higher for better quality
-POPPLER_PATH = r"C:\\poppler-23.11.0\\Library\\bin"  # Adjust for your system
+
+# Detect OS and set appropriate Poppler path
+import platform
+if platform.system() == "Windows":
+    POPPLER_PATH = r"C:\\poppler-23.11.0\\Library\\bin"
+elif platform.system() == "Darwin":  # macOS
+    # For Apple Silicon Macs
+    POPPLER_PATH = "/opt/homebrew/bin"
+else:  # Linux
+    POPPLER_PATH = "/usr/bin"  # Default on most Linux distributions
 
 # Parallel processing
 MAX_WORKERS = None  # None = use CPU count - 1

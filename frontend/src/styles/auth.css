@@ -1,0 +1,64 @@
+/* Auth pages (Login/Register) specific styles */
+.auth-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%);
+  padding: 2rem 1rem;
+}
+
+.auth-container {
+  width: 100%;
+  max-width: 450px;
+  margin: 0 auto;
+}
+
+.get-started-card {
+  margin-top: 2rem;
+  animation: fadeInUp 0.8s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.get-started-card h2 {
+  font-weight: 700;
+}
+
+.get-started-card .btn-light {
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.get-started-card .btn-light:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Responsive adjustments */
+@media (max-width: 576px) {
+  .auth-container {
+    padding: 0 1rem;
+  }
+  
+  .get-started-card {
+    margin-top: 1.5rem;
+  }
+  
+  .get-started-card .card-body {
+    padding: 1.5rem !important;
+  }
+  
+  .get-started-card h2 {
+    font-size: 1.5rem;
+  }
+}
