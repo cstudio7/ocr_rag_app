@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+
+{% block title %}Profile - PDF Knowledge Base{% endblock %}
+
+{% block custom_css %}
+.profile-container {
+    max-width: 600px;
+    margin: 2rem auto;
+    padding: 2rem;
+}
+
+.profile-card {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    padding: 2rem;
+    margin-bottom: 2rem;
+}
+
+.profile-header {
+    text-align: center;
+    margin-bottom: 2rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.profile-avatar {
+    width: 100px;
+    height: 100px;
+    background: linear-gradient(135deg, var(--primary-color), #764ba2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1rem;
+    box-shadow: 0 10px 20px rgba(67, 97, 238, 0.3);
+}
+
+.profile-avatar i {
+    font-size: 2.5rem;
+    color: white;
+}
+
+.profile-header h2 {
+    color: #2d3748;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.profile-header p {
+    color: #718096;
+    margin-bottom: 0;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-label {
+    font-weight: 600;
+    color: #4a5568;
+    margin-bottom: 0.5rem;
+}
+
+.form-control {
+    border-radius: 10px;
+    border: 2px solid #e2e8f0;
+    padding: 0.75rem 1rem;
+    transition: all 0.3s ease;
+}
+
+.form-control:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.2rem rgba(67, 97, 238, 0.25);
+}
+
+.btn-profile {
+    padding: 0.75rem 2rem;
+    border-radius: 10px;
+    font-weight: 600;
+    margin-right: 1rem;
+}
+
+.profile-info {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.info-item:last-child {
+    border-bottom: none;
+}
+
+.info-label {
+    font-weight: 600;
+    color: #4a5568;
+}
+
+.info-value {
+    color: #718096;
+}
+
+.alert {
+    border-radius: 10px;
+    margin-bottom: 1.5rem;
+}
+{% endblock %}
+
+{% block content %}
+<div class="profile-container">
+    <div class="profile-card">
+        <div class="profile-header">
+            <div class="profile-avatar">
+                <i class="fas fa-user"></i>
+            </div>
+            <h2>{{ current_user.get_full_name() }}</h2>
+            <p>@{{ current_user.username }}</p>
+        </div>
+
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- Profile Information -->
+        <div class="profile-info">
+            <h4 class="mb-3"><i class="fas fa-info-circle me-2"></i>Account Information</h4>
+            <div class="info-item">
+                <span class="info-label">Username:</span>
+                <span class="info-value">{{ current_user.username }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Email:</span>
+                <span class="info-value">{{ current_user.email }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Member Since:</span>
+                <span class="info-value">{{ current_user.created_at.strftime('%B %d, %Y') }}</span>
+            </div>
+            {% if current_user.last_login %}
+            <div class="info-item">
+                <span class="info-label">Last Login:</span>
+                <span class="info-value">{{ current_user.last_login.strftime('%B %d, %Y at %I:%M %p') }}</span>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Edit Profile Form -->
+        <h4 class="mb-3"><i class="fas fa-edit me-2"></i>Edit Profile</h4>
+        <form method="POST">
+            {{ form.hidden_tag() }}
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group">
+                        {{ form.first_name.label(class="form-label") }}
+                        {{ form.first_name(class="form-control") }}
+                        {% if form.first_name.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.first_name.errors %}
+                                    <div>{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group">
+                        {{ form.last_name.label(class="form-label") }}
+                        {{ form.last_name(class="form-control") }}
+                        {% if form.last_name.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.last_name.errors %}
+                                    <div>{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                {{ form.email.label(class="form-label") }}
+                {{ form.email(class="form-control") }}
+                {% if form.email.errors %}
+                    <div class="text-danger small mt-1">
+                        {% for error in form.email.errors %}
+                            <div>{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="d-flex justify-content-between">
+                {{ form.submit(class="btn btn-primary btn-profile") }}
+                <a href="{{ url_for('change_password') }}" class="btn btn-outline-secondary btn-profile">
+                    <i class="fas fa-key me-2"></i>Change Password
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
