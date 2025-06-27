@@ -177,6 +177,31 @@ def query_knowledge_base(query_text, top_k=SEARCH_TOP_K, threshold=SEARCH_THRESH
         end_time = time.time()
         logging.info(f"Search completed in {round(end_time - start_time, 3)} seconds")
         logging.info(f"Found {len(processed_results)} results")
+                
+        if not processed_results or max([r['similarity'] for r in processed_results], default=0) < 60:
+            logging.info("⚠️ Using fallback exact match for query")
+            all_data = collection.get()
+            fallback_matches = []
+            for doc, meta in zip(all_data['documents'], all_data['metadatas']):
+                if query_text.lower() in doc.lower():
+                    fallback_matches.append({
+                        'document': meta.get('doc_id', 'unknown'),
+                        'page': meta.get('page_num', 0),
+                        'text': doc,
+                        'similarity': 100.0
+                    })
+
+            if fallback_matches:
+                return {
+                    'query': original_query,
+                    'corrected_query': corrected_query if has_corrections else None,
+                    'corrections': corrections_made if has_corrections else [],
+                    'has_corrections': has_corrections,
+                    'results': fallback_matches,
+                    'total_results': len(fallback_matches),
+                    'search_time': round(time.time() - start_time, 3),
+                    'message': "Fallback exact match used"
+                }
 
         return {
             'query': original_query,
@@ -199,10 +224,13 @@ def query_knowledge_base(query_text, top_k=SEARCH_TOP_K, threshold=SEARCH_THRESH
             'total_results': 0,
             'error': str(e)
         }
+    
+
 
 def query_knowledge_base_no_correction(query_text, top_k=SEARCH_TOP_K, threshold=SEARCH_THRESHOLD):
     """
     Searches the vector store for semantically similar chunks without spell correction.
+    Falls back to exact match if semantic results are insufficient.
 
     Args:
         query_text (str): The query text to search for
@@ -212,6 +240,7 @@ def query_knowledge_base_no_correction(query_text, top_k=SEARCH_TOP_K, threshold
     Returns:
         Dict: Dictionary with query, results, and metadata
     """
+    import time
     start_time = time.time()
     logging.info(f"Searching for (no correction): {query_text}")
 
@@ -236,7 +265,6 @@ def query_knowledge_base_no_correction(query_text, top_k=SEARCH_TOP_K, threshold
             logging.warning(f"Error checking collection count: {e}")
 
         try:
-            # Query the collection
             results = collection.query(
                 query_texts=[query_text],
                 n_results=top_k,
@@ -244,7 +272,6 @@ def query_knowledge_base_no_correction(query_text, top_k=SEARCH_TOP_K, threshold
             )
         except Exception as e:
             logging.error(f"Error during query: {e}")
-            # This might happen if the collection was created without an embedding function
             return {
                 'query': query_text,
                 'corrected_query': None,
@@ -252,39 +279,52 @@ def query_knowledge_base_no_correction(query_text, top_k=SEARCH_TOP_K, threshold
                 'has_corrections': False,
                 'results': [],
                 'total_results': 0,
-                'error': "Search functionality is not available. Please index documents first."
+                'error': "Search failed. Please reindex documents."
             }
 
-        # Process results
         processed_results = []
 
         if results and 'documents' in results and results['documents']:
-            documents = results['documents'][0]  # First query results
+            documents = results['documents'][0]
             metadatas = results['metadatas'][0]
             distances = results['distances'][0]
 
             for i, (doc, meta, dist) in enumerate(zip(documents, metadatas, distances)):
-                # Convert distance to similarity score (0-100%)
                 similarity = max(0, min(100, (1 - dist) * 100))
-
-                # Skip results below threshold
                 if similarity < threshold:
                     continue
-
-                # Get document info
-                doc_id = meta.get('doc_id', 'unknown')
-                page_num = meta.get('page_num', 0)
-
                 processed_results.append({
-                    'document': doc_id,
-                    'page': page_num,
+                    'document': meta.get('doc_id', 'unknown'),
+                    'page': meta.get('page_num', 0),
                     'text': doc,
                     'similarity': round(similarity, 2)
                 })
 
-        end_time = time.time()
-        logging.info(f"Search completed in {round(end_time - start_time, 3)} seconds")
-        logging.info(f"Found {len(processed_results)} results")
+        # ✅ Fallback to exact substring match if no or weak semantic results
+        if not processed_results or max([r['similarity'] for r in processed_results], default=0) < threshold:
+            logging.info("⚠️ Using fallback exact match (no correction)")
+            all_data = collection.get()
+            fallback_matches = []
+            for doc, meta in zip(all_data['documents'], all_data['metadatas']):
+                if query_text.lower() in doc.lower():
+                    fallback_matches.append({
+                        'document': meta.get('doc_id', 'unknown'),
+                        'page': meta.get('page_num', 0),
+                        'text': doc,
+                        'similarity': 100.0
+                    })
+
+            if fallback_matches:
+                return {
+                    'query': query_text,
+                    'corrected_query': None,
+                    'corrections': [],
+                    'has_corrections': False,
+                    'results': fallback_matches,
+                    'total_results': len(fallback_matches),
+                    'search_time': round(time.time() - start_time, 3),
+                    'message': "Fallback exact match used"
+                }
 
         return {
             'query': query_text,
@@ -293,11 +333,11 @@ def query_knowledge_base_no_correction(query_text, top_k=SEARCH_TOP_K, threshold
             'has_corrections': False,
             'results': processed_results,
             'total_results': len(processed_results),
-            'search_time': round(end_time - start_time, 3)
+            'search_time': round(time.time() - start_time, 3)
         }
 
     except Exception as e:
-        logging.error(f"Error searching knowledge base: {e}")
+        logging.error(f"Error in query_knowledge_base_no_correction: {e}")
         return {
             'query': query_text,
             'corrected_query': None,
@@ -472,12 +512,13 @@ def get_document_stats():
             'doc_count': 0,
             'chunk_count': 0
         }
+
 def get_document_list():
     """
-    Get list of all indexed documents with detailed metadata.
+    Get list of all indexed documents with their chunk counts.
 
     Returns:
-        list: List of document dictionaries with metadata
+        List[Tuple]: List of (doc_id, chunk_count) tuples
     """
     try:
         collection = get_chroma_collection()
@@ -492,37 +533,21 @@ def get_document_list():
             return []
 
         try:
-            # Get all metadatas and IDs
+            # Get all metadatas
             all_data = collection.get()
+
             if not all_data or 'metadatas' not in all_data or not all_data['metadatas']:
                 return []
 
-            # Group data by document ID
-            documents = {}
-            for i, meta in enumerate(all_data['metadatas']):
-                doc_id = meta.get('doc_id')
-                if not doc_id:
-                    continue
+            # Count chunks per document
+            doc_counts = {}
+            for meta in all_data['metadatas']:
+                if 'doc_id' in meta:
+                    doc_id = meta['doc_id']
+                    doc_counts[doc_id] = doc_counts.get(doc_id, 0) + 1
 
-                if doc_id not in documents:
-                    documents[doc_id] = {
-                        'doc_id': doc_id,
-                        'chunk_count': 0,
-                        'upload_date': meta.get('upload_date'),
-                        'file_size': meta.get('file_size'),
-                        'page_count': meta.get('page_count'),
-                        'category': meta.get('category') or 'Uncategorized',
-                        'tags': meta.get('tags', []),
-                        'last_updated': meta.get('last_updated', meta.get('upload_date'))
-                    }
-
-                documents[doc_id]['chunk_count'] += 1
-
-            # Convert to list and sort by upload date (newest first)
-            doc_list = list(documents.values())
-            doc_list.sort(key=lambda x: x.get('upload_date') or '1970-01-01', reverse=True)
-
-            return doc_list
+            # Convert to list of tuples for JSON serialization
+            return list(doc_counts.items())
         except Exception as e:
             logging.warning(f"Error getting collection data: {e}")
             return []
@@ -530,136 +555,3 @@ def get_document_list():
     except Exception as e:
         logging.error(f"Error getting document list: {e}")
         return []
-
-
-# def get_document_list():
-#     """
-#     Get list of all indexed documents with detailed metadata.
-
-#     Returns:
-#         list: List of document dictionaries with metadata
-#     """
-#     try:
-#         collection = get_chroma_collection()
-
-#         # First check if we can get the count
-#         try:
-#             count = collection.count()
-#             if count == 0:
-#                 return []
-#         except Exception as e:
-#             logging.warning(f"Error getting collection count: {e}")
-#             return []
-
-#         try:
-#             # Get all metadatas and IDs
-#             all_data = collection.get()
-
-#             if not all_data or 'metadatas' not in all_data or not all_data['metadatas']:
-#                 return []
-
-#             # Group data by document
-#             documents = {}
-#             for i, meta in enumerate(all_data['metadatas']):
-#                 if 'doc_id' in meta:
-#                     doc_id = meta['doc_id']
-#                     if doc_id not in documents:
-#                         documents[doc_id] = {
-#                             'doc_id': doc_id,
-#                             'chunk_count': 0,
-#                             'upload_date': None,
-#                             'file_size': None,
-#                             'page_count': None,
-#                             'category': meta.get('category', 'Uncategorized'),
-#                             'folder': meta.get('folder', 'uncategorized'),
-#                             'tags': meta.get('tags', []),
-#                             'last_updated': None
-#                         }
-
-#                     # Increment chunk count
-#                     documents[doc_id]['chunk_count'] += 1
-
-#                     # Extract metadata (use the first occurrence for document-level metadata)
-#                     if documents[doc_id]['upload_date'] is None:
-#                         documents[doc_id]['upload_date'] = meta.get('upload_date')
-#                         documents[doc_id]['file_size'] = meta.get('file_size')
-#                         documents[doc_id]['page_count'] = meta.get('page_count')
-#                         documents[doc_id]['last_updated'] = meta.get('last_updated', meta.get('upload_date'))
-#                         documents[doc_id]['category'] = meta.get('category', 'Uncategorized')
-#                         documents[doc_id]['folder'] = meta.get('folder', 'uncategorized')
-
-#             # Convert to list and sort by upload date (newest first)
-#             doc_list = list(documents.values())
-#             doc_list.sort(key=lambda x: x.get('upload_date') or '1970-01-01', reverse=True)
-
-#             return doc_list
-#         except Exception as e:
-#             logging.warning(f"Error getting collection data: {e}")
-#             return []
-
-#     except Exception as e:
-#         logging.error(f"Error getting document list: {e}")
-#         return []
-
-def reindex_document(doc_id):
-    """
-    Re-index a specific document by removing it and re-processing the PDF file.
-
-    Args:
-        doc_id (str): Document ID to re-index
-
-    Returns:
-        dict: Result of re-indexing operation
-    """
-    try:
-        import os
-        from .indexer import index_pdf
-        from config import PDF_DIR
-
-        # Check if PDF file exists
-        pdf_path = os.path.join(PDF_DIR, doc_id)
-        if not os.path.exists(pdf_path):
-            return {
-                'success': False,
-                'error': f'PDF file not found: {doc_id}'
-            }
-
-        # Get collection
-        collection = get_chroma_collection()
-
-        # Delete existing document chunks
-        try:
-            doc_chunks = collection.get(where={"doc_id": doc_id})
-            if doc_chunks and 'ids' in doc_chunks and doc_chunks['ids']:
-                collection.delete(ids=doc_chunks['ids'])
-                logging.info(f"Deleted {len(doc_chunks['ids'])} existing chunks for {doc_id}")
-        except Exception as delete_error:
-            logging.warning(f"Error deleting existing chunks for {doc_id}: {delete_error}")
-
-        # Re-index the document
-        try:
-            result = index_pdf(pdf_path)
-            if result.get('success'):
-                return {
-                    'success': True,
-                    'message': f'Successfully re-indexed {doc_id}',
-                    'chunks_created': result.get('chunks_created', 0)
-                }
-            else:
-                return {
-                    'success': False,
-                    'error': f'Failed to re-index {doc_id}: {result.get("error", "Unknown error")}'
-                }
-        except Exception as index_error:
-            logging.error(f"Error re-indexing {doc_id}: {index_error}")
-            return {
-                'success': False,
-                'error': f'Error re-indexing {doc_id}: {str(index_error)}'
-            }
-
-    except Exception as e:
-        logging.error(f"Error in reindex_document: {e}")
-        return {
-            'success': False,
-            'error': f'Error re-indexing document: {str(e)}'
-        }

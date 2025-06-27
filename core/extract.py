@@ -1,6 +1,7 @@
 """
-Text extraction module for PDF documents.
-Uses OCR to extract text from scanned PDFs.
+Smart text extraction module for PDF documents.
+Uses direct PDF text extraction first, falls back to OCR for scanned documents.
+Handles both native PDFs and image-based PDFs with optimal performance.
 """
 from pdf2image import convert_from_path
 import pytesseract
@@ -8,121 +9,155 @@ from concurrent.futures import ThreadPoolExecutor
 import logging
 import sys
 import os
-from sentence_transformers import SentenceTransformer
 
 # Import configuration
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config import OCR_LANGUAGE, OCR_DPI, POPPLER_PATH, MAX_WORKERS, EMBEDDING_MODEL
+from config import OCR_LANGUAGE, OCR_DPI, POPPLER_PATH, TESSERACT_PATH, MAX_WORKERS
 
-# Optional: Set this only if Tesseract is not in your system PATH
-# pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+# Set Tesseract path if found by configuration
+if TESSERACT_PATH:
+    pytesseract.pytesseract.tesseract_cmd = TESSERACT_PATH
+    logging.info(f"Using Tesseract at: {TESSERACT_PATH}")
+else:
+    logging.info("Using Tesseract from system PATH")
 
-# Initialize the embedding model
-model = SentenceTransformer(EMBEDDING_MODEL)
-
-def convert_pdf_to_images(pdf_path, dpi=OCR_DPI, poppler_path=POPPLER_PATH):
+def extract_text_direct_pymupdf(pdf_path):
     """
-    Convert PDF pages to images.
-    
+    Extract text directly from PDF using PyMuPDF (fastest method).
+
     Args:
         pdf_path (str): Path to the PDF file
-        dpi (int): DPI for conversion
-        poppler_path (str): Path to poppler binaries
-        
+
     Returns:
-        list: List of PIL Image objects
+        List[Dict]: List of {'page_num': int, 'text': str} or None if failed
     """
     try:
-        return convert_from_path(pdf_path, dpi=dpi, poppler_path=poppler_path)
-    except Exception as e:
-        logging.error(f"Error converting PDF to images: {e}")
-        return []
+        import fitz  # PyMuPDF
 
-def process_ocr(image, lang=OCR_LANGUAGE):
-    """
-    Process a single image with OCR.
-    
-    Args:
-        image: PIL Image object
-        lang (str): Language for OCR
-        
-    Returns:
-        str: Extracted text
-    """
-    try:
-        return pytesseract.image_to_string(image, lang=lang).strip()
-    except Exception as e:
-        logging.error(f"Error processing OCR: {e}")
-        return ""
+        logging.info(f"Attempting direct text extraction with PyMuPDF: {pdf_path}")
 
-def chunk_text(text, page_num, max_length=500):
-    """
-    Split text into chunks with metadata.
-    
-    Args:
-        text (str): Text to chunk
-        page_num (int): Page number
-        max_length (int): Maximum chunk length
-        
-    Returns:
-        list: List of chunks with metadata
-    """
-    chunks = []
-    lines = text.strip().split('\n')
-    current_chunk = ""
-    
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
-            
-        # If line would make chunk too long, save current chunk and start new one
-        if len(current_chunk) + len(line) > max_length:
-            if current_chunk:
-                chunks.append(current_chunk.strip())
-            current_chunk = line
+        doc = fitz.open(pdf_path)
+        pages_text = []
+        total_chars = 0
+
+        for page_num in range(len(doc)):
+            page = doc.load_page(page_num)
+            page_text = page.get_text()
+
+            pages_text.append({
+                'page_num': page_num + 1,
+                'text': page_text
+            })
+
+            total_chars += len(page_text.strip())
+
+        doc.close()
+
+        # Check if we got meaningful text (threshold: 50 chars per page on average)
+        avg_chars_per_page = total_chars / len(pages_text) if pages_text else 0
+
+        if avg_chars_per_page > 50:
+            logging.info(f"PyMuPDF successful: {total_chars} characters from {len(pages_text)} pages")
+            return pages_text
         else:
-            current_chunk = current_chunk + " " + line if current_chunk else line
-            
-    # Add final chunk if any
-    if current_chunk:
-        chunks.append(current_chunk.strip())
-        
-    return chunks
+            logging.info(f"PyMuPDF extracted minimal text ({total_chars} chars), likely scanned PDF")
+            return None
 
-def generate_embeddings(text_chunks):
+    except ImportError:
+        logging.info("PyMuPDF not available, skipping direct extraction")
+        return None
+    except Exception as e:
+        logging.warning(f"PyMuPDF extraction failed: {e}")
+        return None
+
+def extract_text_direct_pdfplumber(pdf_path):
     """
-    Generate embeddings for text chunks.
-    
+    Extract text directly from PDF using PDFPlumber (alternative method).
+
     Args:
-        text_chunks (list): List of text chunks
-        
+        pdf_path (str): Path to the PDF file
+
     Returns:
-        list: List of embeddings
+        List[Dict]: List of {'page_num': int, 'text': str} or None if failed
     """
     try:
-        return model.encode(text_chunks, show_progress_bar=False)
+        import pdfplumber
+
+        logging.info(f"Attempting direct text extraction with PDFPlumber: {pdf_path}")
+
+        pages_text = []
+        total_chars = 0
+
+        with pdfplumber.open(pdf_path) as pdf:
+            for i, page in enumerate(pdf.pages, 1):
+                page_text = page.extract_text() or ""
+
+                pages_text.append({
+                    'page_num': i,
+                    'text': page_text
+                })
+
+                total_chars += len(page_text.strip())
+
+        # Check if we got meaningful text
+        avg_chars_per_page = total_chars / len(pages_text) if pages_text else 0
+
+        if avg_chars_per_page > 50:
+            logging.info(f"PDFPlumber successful: {total_chars} characters from {len(pages_text)} pages")
+            return pages_text
+        else:
+            logging.info(f"PDFPlumber extracted minimal text ({total_chars} chars), likely scanned PDF")
+            return None
+
+    except ImportError:
+        logging.info("PDFPlumber not available, skipping direct extraction")
+        return None
     except Exception as e:
-        logging.error(f"Error generating embeddings: {e}")
-        return []
+        logging.warning(f"PDFPlumber extraction failed: {e}")
+        return None
 
 def process_image(args):
     """
-    Process a single image with OCR.
-    
+    Process a single image with OCR using optimized settings.
+
     Args:
         args: Tuple of (image, page_num, lang)
-        
+
     Returns:
         Dict with page_num and extracted text
     """
     image, page_num, lang = args
     try:
         logging.info(f"OCR processing page {page_num}...")
-        text = pytesseract.image_to_string(image, lang=lang)
+
+        # Use optimized OCR configuration for better accuracy
+        # PSM 6 works well for document blocks, PSM 1 for full page analysis
+        custom_config = r'--oem 3 --psm 6'
+
+        try:
+            # Try with optimized config first
+            text = pytesseract.image_to_string(image, lang=lang, config=custom_config)
+
+            # If we get very little text, try PSM 1 (full page analysis)
+            if len(text.strip()) < 10:
+                text = pytesseract.image_to_string(image, lang=lang, config=r'--oem 3 --psm 1')
+
+        except:
+            # Fallback to basic OCR if custom config fails
+            text = pytesseract.image_to_string(image, lang=lang)
+
+        # Clean up the extracted text
+        text = text.strip()
+
+        # Log success with text length for debugging
+        if text:
+            logging.info(f"OCR page {page_num}: extracted {len(text)} characters")
+        else:
+            logging.warning(f"OCR page {page_num}: no text extracted")
+
         return {
             'page_num': page_num,
-            'text': text.strip()
+            'text': text
         }
     except Exception as e:
         logging.error(f"Error processing page {page_num}: {e}")
@@ -131,11 +166,66 @@ def process_image(args):
             'text': ""
         }
 
-def extract_text_by_page(pdf_path, lang=OCR_LANGUAGE, poppler_path=POPPLER_PATH, 
+def extract_text_by_page_smart(pdf_path, lang=OCR_LANGUAGE, poppler_path=POPPLER_PATH,
+                              max_workers=MAX_WORKERS, dpi=OCR_DPI, page_ranges=None):
+    """
+    Smart text extraction that tries direct PDF text extraction first,
+    falls back to OCR for scanned documents.
+
+    Args:
+        pdf_path (str): Path to the input PDF file.
+        lang (str): Language code for OCR (e.g., 'eng').
+        poppler_path (str): Optional poppler binary path (Windows only).
+        max_workers (int): Maximum number of worker threads for OCR.
+        dpi (int): DPI for image conversion. Lower values are faster but less accurate.
+        page_ranges (list): Optional list of page ranges to process, e.g. [(1,10), (20,30)].
+                           If None, processes all pages.
+
+    Returns:
+        List[Dict]: List of {'page_num': int, 'text': str}
+    """
+    logging.info(f"Starting smart text extraction for: {pdf_path}")
+
+    # Try direct text extraction first (PyMuPDF)
+    pages_text = extract_text_direct_pymupdf(pdf_path)
+    if pages_text:
+        logging.info("Direct text extraction successful with PyMuPDF")
+        return pages_text
+
+    # Try PDFPlumber as backup
+    pages_text = extract_text_direct_pdfplumber(pdf_path)
+    if pages_text:
+        logging.info("Direct text extraction successful with PDFPlumber")
+        return pages_text
+
+    # Fall back to OCR for scanned documents
+    logging.info("Direct extraction failed, falling back to OCR")
+    return extract_text_by_page_ocr(pdf_path, lang, poppler_path, max_workers, dpi, page_ranges)
+
+def extract_text_by_page(pdf_path, lang=OCR_LANGUAGE, poppler_path=POPPLER_PATH,
                          max_workers=MAX_WORKERS, dpi=OCR_DPI, page_ranges=None):
     """
+    Main text extraction function - uses smart extraction by default.
+
+    Args:
+        pdf_path (str): Path to the input PDF file.
+        lang (str): Language code for OCR (e.g., 'eng').
+        poppler_path (str): Optional poppler binary path (Windows only).
+        max_workers (int): Maximum number of worker threads for OCR.
+        dpi (int): DPI for image conversion. Lower values are faster but less accurate.
+        page_ranges (list): Optional list of page ranges to process, e.g. [(1,10), (20,30)].
+                           If None, processes all pages.
+
+    Returns:
+        List[Dict]: List of {'page_num': int, 'text': str}
+    """
+    return extract_text_by_page_smart(pdf_path, lang, poppler_path, max_workers, dpi, page_ranges)
+
+def extract_text_by_page_ocr(pdf_path, lang=OCR_LANGUAGE, poppler_path=POPPLER_PATH,
+                             max_workers=MAX_WORKERS, dpi=OCR_DPI, page_ranges=None):
+    """
     Extracts text from each page of a scanned PDF using Tesseract OCR in parallel.
-    Optimized for speed with lower DPI and page range processing.
+    This is the OCR-only version, used as fallback when direct extraction fails.
 
     Args:
         pdf_path (str): Path to the input PDF file.

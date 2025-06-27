@@ -16,14 +16,15 @@ logging.info(f"Loaded embedding model: {EMBEDDING_MODEL}")
 
 def chunk_text(text, max_length=500):
     """
-    Splits text into chunks, retaining important headings and small fragments.
-    
+    Splits text into semantically coherent chunks while preserving headings, short lines,
+    and limiting chunk size for embedding purposes.
+
     Args:
-        text (str): The text to chunk
-        max_length (int): Maximum length of each chunk
-        
+        text (str): The raw extracted text
+        max_length (int): Maximum number of characters per chunk
+
     Returns:
-        List[str]: List of text chunks
+        List[str]: List of cleaned and sized text chunks
     """
     lines = text.strip().split('\n')
     chunks = []
@@ -34,23 +35,33 @@ def chunk_text(text, max_length=500):
         if not line:
             continue
 
-        # Treat short or heading-like lines as separate chunks
-        if len(line) < 60 and (line.isupper() or line.endswith('.') or line[:2].isdigit()):
+        # Standalone heading or section marker
+        is_heading = (
+            len(line) < 60 and
+            (line.isupper() or line.endswith(':') or line[:2].isdigit())
+        )
+
+        if is_heading:
             if buffer:
                 chunks.append(buffer.strip())
                 buffer = ""
             chunks.append(line)
-        else:
-            if len(buffer + " " + line) <= max_length:
-                buffer += " " + line
-            else:
-                chunks.append(buffer.strip())
-                buffer = line
+            continue
 
+        # Try to fill the buffer up to max_length
+        if len(buffer + " " + line) <= max_length:
+            buffer += " " + line
+        else:
+            if buffer:
+                chunks.append(buffer.strip())
+            buffer = line  # start new buffer
+
+    # Add any remaining content
     if buffer:
         chunks.append(buffer.strip())
 
     return chunks
+
 
 def embed_chunks(page_texts, doc_id, batch_size=64):
     """
@@ -94,7 +105,7 @@ def embed_chunks(page_texts, doc_id, batch_size=64):
         # Combine with metadata
         for chunk, embedding, metadata in zip(batch_chunks, batch_embeddings, batch_metadata):
             results.append({
-                'embedding': embedding,
+                'embedding': embedding.tolist(),  # Convert numpy array to list for ChromaDB
                 'text': chunk,
                 'doc_id': metadata['doc_id'],
                 'page_num': metadata['page_num'],

@@ -4,7 +4,7 @@ Forms for user authentication and registration.
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, BooleanField, SubmitField
 from wtforms.validators import DataRequired, Email, Length, EqualTo, ValidationError
-from .models import User
+from models import User
 
 class LoginForm(FlaskForm):
     """Login form for user authentication."""
@@ -69,6 +69,26 @@ class RegistrationForm(FlaskForm):
         if user:
             raise ValidationError('Email already registered. Please use a different email address.')
 
+class ChangePasswordForm(FlaskForm):
+    """Form for changing user password."""
+    
+    current_password = PasswordField(
+        'Current Password',
+        validators=[DataRequired()],
+        render_kw={'placeholder': 'Enter your current password'}
+    )
+    new_password = PasswordField(
+        'New Password',
+        validators=[DataRequired(), Length(min=6)],
+        render_kw={'placeholder': 'Enter new password (min 6 characters)'}
+    )
+    new_password2 = PasswordField(
+        'Confirm New Password',
+        validators=[DataRequired(), EqualTo('new_password', message='Passwords must match')],
+        render_kw={'placeholder': 'Confirm your new password'}
+    )
+    submit = SubmitField('Change Password')
+
 class ProfileForm(FlaskForm):
     """Form for updating user profile."""
     
@@ -99,29 +119,3 @@ class ProfileForm(FlaskForm):
             user = User.query.filter_by(email=email.data).first()
             if user:
                 raise ValidationError('Email already registered. Please use a different email address.')
-
-class ChangePasswordForm(FlaskForm):
-    """Form for changing user password."""
-    
-    current_password = PasswordField(
-        'Current Password',
-        validators=[DataRequired()],
-        render_kw={'placeholder': 'Enter your current password'}
-    )
-    new_password = PasswordField(
-        'New Password',
-        validators=[
-            DataRequired(),
-            Length(min=6, message='Password must be at least 6 characters long.')
-        ],
-        render_kw={'placeholder': 'Enter your new password (min 6 characters)'}
-    )
-    confirm_password = PasswordField(
-        'Confirm New Password',
-        validators=[
-            DataRequired(),
-            EqualTo('new_password', message='Passwords must match.')
-        ],
-        render_kw={'placeholder': 'Confirm your new password'}
-    )
-    submit = SubmitField('Change Password') 

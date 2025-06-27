@@ -20,10 +20,7 @@ from config import (
     VECTOR_STORE_DIR, CACHE_DIR, CHROMA_BATCH_SIZE, MAX_WORKERS,
     POPPLER_PATH, EMBEDDING_MODEL, COLLECTION_NAME
 )
-from core.extract import (
-    extract_text_by_page, convert_pdf_to_images,
-    process_ocr, chunk_text, generate_embeddings
-)
+from core.extract import extract_text_by_page
 from core.embedding import embed_chunks
 
 # Create necessary directories
@@ -43,6 +40,11 @@ def get_chroma_collection():
     global _client, _collection
 
     if _client is None:
+        # Temporarily suppress ChromaDB warnings during initialization
+        chroma_logger = logging.getLogger('chromadb')
+        original_level = chroma_logger.level
+        chroma_logger.setLevel(logging.ERROR)
+
         try:
             # First try with PersistentClient for better persistence
             logging.info(f"Initializing ChromaDB PersistentClient at {os.path.abspath(VECTOR_STORE_DIR)}")
@@ -68,7 +70,9 @@ def get_chroma_collection():
             # Force persistence by adding and then deleting a test document
             try:
                 test_id = "test_persistence"
-                if test_id not in [id for id in _collection.get()['ids']]:
+                # Check if test document exists more efficiently
+                existing = _collection.get(ids=[test_id])
+                if not existing['ids']:  # Test document doesn't exist
                     _collection.add(
                         documents=["Test document for persistence"],
                         ids=[test_id],
@@ -85,6 +89,9 @@ def get_chroma_collection():
             logging.info("Creating collection without embedding function")
             # Create collection without embedding function for basic operations
             _collection = _client.get_or_create_collection(COLLECTION_NAME)
+        finally:
+            # Restore original logging level
+            chroma_logger.setLevel(original_level)
 
     return _collection
 
@@ -158,7 +165,7 @@ def process_and_embed_pages(file_path, doc_id):
         # Fallback method: try to get page count using pdf2image
         try:
             import subprocess
-            # Try using pdf-info from poppler if available
+            # Try using pdfinfo from poppler if available
             cmd = os.path.join(POPPLER_PATH, "pdfinfo.exe") if os.name == 'nt' else "pdfinfo"
 
             output = subprocess.check_output([cmd, file_path], universal_newlines=True)
@@ -231,81 +238,11 @@ def process_and_embed_pages(file_path, doc_id):
 
     return all_chunks
 
-# def add_chunks_to_db(chunks, doc_id, category="Uncategorized", batch_size=CHROMA_BATCH_SIZE, progress_callback=None):
-#     if not chunks:
-#         logging.warning(f"No chunks to add for {doc_id}")
-#         return
-
-#     collection = get_chroma_collection()
-#     total_chunks = len(chunks)
-#     logging.info(f"Adding {total_chunks} chunks to vector store for {doc_id}")
-
-#     if total_chunks > 1000:
-#         adjusted_batch_size = min(batch_size, 50)
-#     else:
-#         adjusted_batch_size = batch_size
-
-#     existing_id_list = []
-#     try:
-#         existing_ids = collection.get(where={"doc_id": doc_id}, include=["metadatas"])
-#         if existing_ids and 'ids' in existing_ids:
-#             existing_id_list = list(existing_ids['ids'])
-#             if progress_callback:
-#                 progress_callback(f"Found {len(existing_id_list)} existing chunks for {doc_id}")
-#     except Exception as e:
-#         logging.warning(f"Error checking for existing chunks: {e}")
-
-#     total_batches = (total_chunks - 1) // adjusted_batch_size + 1
-
-#     for i in range(0, total_chunks, adjusted_batch_size):
-#         batch = chunks[i:i + adjusted_batch_size]
-#         batch_num = i // adjusted_batch_size + 1
-
-#         ids, documents, embeddings, metadatas = [], [], [], []
-
-#         for chunk in batch:
-#             uid = f"{doc_id}_p{chunk['page_num']}_c{chunk['chunk_index']}"
-#             if uid in existing_id_list:
-#                 if progress_callback:
-#                     progress_callback(f"Skipping existing chunk {uid}")
-#                 continue
-
-#             ids.append(uid)
-#             documents.append(chunk['text'])
-
-#             embedding = chunk['embedding']
-#             if hasattr(embedding, 'tolist'):
-#                 embedding = embedding.tolist()
-#             embeddings.append(embedding)
-
-#             metadatas.append({
-#                 'doc_id': doc_id,
-#                 'page_num': chunk['page_num'],
-#                 'chunk_index': chunk['chunk_index'],
-#                 'category': category,
-#                 'upload_date': time.strftime('%Y-%m-%d'),
-#                 'last_updated': time.strftime('%Y-%m-%d'),
-#             })
-
-#         if not ids:
-#             continue
-
-#         try:
-#             collection.add(
-#                 documents=documents,
-#                 embeddings=embeddings,
-#                 ids=ids,
-#                 metadatas=metadatas
-#             )
-#             if progress_callback:
-#                 progress_callback(f"Added batch {batch_num}/{total_batches} to vector store ({len(ids)} chunks)")
-#         except Exception as e:
-#             logging.error(f"Error adding batch {batch_num}: {e}")
-
-#         progress = min(100, (i + adjusted_batch_size) / total_chunks * 100)
-#         if progress_callback:
-#             progress_callback(f"Database progress: {progress:.1f}%")
-def add_chunks_to_db(chunks, doc_id, category="Uncategorized", batch_size=CHROMA_BATCH_SIZE, progress_callback=None):
+def add_chunks_to_db(chunks, doc_id, batch_size=CHROMA_BATCH_SIZE, folder_name=None, file_path=None):
+    """
+    Add chunks to ChromaDB in batches for better performance.
+    Optimized with smaller batch sizes and incremental updates.
+    """
     if not chunks:
         logging.warning(f"No chunks to add for {doc_id}")
         return
@@ -314,58 +251,93 @@ def add_chunks_to_db(chunks, doc_id, category="Uncategorized", batch_size=CHROMA
     total_chunks = len(chunks)
     logging.info(f"Adding {total_chunks} chunks to vector store for {doc_id}")
 
+    # Use smaller batch size for very large documents to avoid memory issues
     if total_chunks > 1000:
-        adjusted_batch_size = min(batch_size, 50)
+        adjusted_batch_size = min(batch_size, 50)  # Reduce batch size for large docs
+        logging.info(f"Adjusting batch size to {adjusted_batch_size} for large document")
     else:
         adjusted_batch_size = batch_size
 
-    existing_id_list = []
+    # Check for existing document chunks to avoid duplicates
+    existing_ids_set = set()
     try:
-        existing_ids = collection.get(where={"doc_id": doc_id}, include=["metadatas"])
-        if existing_ids and 'ids' in existing_ids:
-            existing_id_list = list(existing_ids['ids'])
-            if progress_callback:
-                progress_callback(f"Found {len(existing_id_list)} existing chunks for {doc_id}")
+        logging.info(f"Checking for existing chunks with doc_id: {doc_id}")
+        existing_data = collection.get(
+            where={"doc_id": doc_id},
+            include=["metadatas"]
+        )
+        if existing_data and 'ids' in existing_data and existing_data['ids']:
+            existing_ids_set = set(existing_data['ids'])
+            logging.warning(f"Found {len(existing_ids_set)} existing chunks for {doc_id}")
+            logging.info(f"Sample existing IDs: {list(existing_ids_set)[:5]}...")
+
+            # Delete existing chunks to avoid duplicates
+            logging.info(f"Deleting existing chunks for {doc_id}")
+            collection.delete(where={"doc_id": doc_id})
+
+            # Verify deletion
+            verify_data = collection.get(where={"doc_id": doc_id})
+            if verify_data and verify_data.get('ids'):
+                logging.error(f"Failed to delete all chunks! {len(verify_data['ids'])} chunks still remain")
+                existing_ids_set = set(verify_data['ids'])  # Keep track of what's still there
+            else:
+                logging.info(f"Successfully deleted all existing chunks for {doc_id}")
+                existing_ids_set = set()  # Reset since we deleted everything
+        else:
+            logging.info(f"No existing chunks found for {doc_id}")
     except Exception as e:
         logging.warning(f"Error checking for existing chunks: {e}")
+        existing_ids_set = set()
 
+    # Process in batches with progress tracking
     total_batches = (total_chunks - 1) // adjusted_batch_size + 1
 
     for i in range(0, total_chunks, adjusted_batch_size):
-        batch = chunks[i:i + adjusted_batch_size]
+        batch = chunks[i:i+adjusted_batch_size]
         batch_num = i // adjusted_batch_size + 1
 
-        ids, documents, embeddings, metadatas = [], [], [], []
+        # Prepare batch data
+        ids = []
+        documents = []
+        embeddings = []
+        metadatas = []
 
         for chunk in batch:
             uid = f"{doc_id}_p{chunk['page_num']}_c{chunk['chunk_index']}"
-            if uid in existing_id_list:
-                if progress_callback:
-                    progress_callback(f"Skipping existing chunk {uid}")
+
+            # Skip if this ID already exists (shouldn't happen since we delete existing chunks)
+            if uid in existing_ids_set:
                 continue
 
             ids.append(uid)
             documents.append(chunk['text'])
 
+            # Ensure embedding is a list (convert numpy array if needed)
             embedding = chunk['embedding']
             if hasattr(embedding, 'tolist'):
                 embedding = embedding.tolist()
             embeddings.append(embedding)
 
-            metadatas.append({
-            'doc_id': doc_id,
-            'page_num': chunk['page_num'],
-            'chunk_index': chunk['chunk_index'],
-            'category': category,
-            'folder': category, 
-            'upload_date': time.strftime('%Y-%m-%d'),
-            'last_updated': time.strftime('%Y-%m-%d'),
-            })
+            metadata = {
+                'doc_id': doc_id,
+                'page_num': chunk['page_num'],
+                'chunk_index': chunk['chunk_index']
+            }
 
+            # Add folder information if provided
+            if folder_name:
+                metadata['folder_name'] = folder_name
+            if file_path:
+                metadata['file_path'] = file_path
 
+            metadatas.append(metadata)
+
+        # Skip empty batches
         if not ids:
+            logging.info(f"Skipping batch {batch_num}/{total_batches} (already indexed)")
             continue
 
+        # Add batch to ChromaDB
         try:
             collection.add(
                 documents=documents,
@@ -373,17 +345,20 @@ def add_chunks_to_db(chunks, doc_id, category="Uncategorized", batch_size=CHROMA
                 ids=ids,
                 metadatas=metadatas
             )
-            if progress_callback:
-                progress_callback(f"Added batch {batch_num}/{total_batches} to vector store ({len(ids)} chunks)")
+            logging.info(f"Added batch {batch_num}/{total_batches} to vector store ({len(ids)} chunks)")
         except Exception as e:
-            logging.error(f"Error adding batch {batch_num}: {e}")
+            # Log error without exposing embedding data
+            error_msg = str(e)
+            if "Expected each embedding" in error_msg:
+                logging.error(f"Error adding batch {batch_num}: Embedding format issue - check data types")
+            else:
+                logging.error(f"Error adding batch {batch_num}: {error_msg[:200]}...")  # Truncate long errors
 
+        # Report progress percentage
         progress = min(100, (i + adjusted_batch_size) / total_chunks * 100)
-        if progress_callback:
-            progress_callback(f"Database progress: {progress:.1f}%")
+        logging.info(f"Database progress: {progress:.1f}%")
 
-
-def build_knowledge_base_optimized(file_path, doc_id, category="Uncategorized"):
+def build_knowledge_base_optimized(file_path, doc_id, folder_name=None):
     """
     Optimized version of knowledge base building with:
     - Parallel OCR processing
@@ -400,44 +375,34 @@ def build_knowledge_base_optimized(file_path, doc_id, category="Uncategorized"):
         logging.error(f"No chunks generated for {doc_id}")
         return False
 
-    # Add chunks to vector database with category
-    add_chunks_to_db(chunks, doc_id, category)
+    # Determine folder name if not provided
+    if not folder_name:
+        # Extract folder name from file path
+        folder_path = os.path.dirname(file_path)
+        folder_name = os.path.basename(folder_path) if folder_path != os.path.dirname(folder_path) else "Uncategorized"
+
+    # Add chunks to vector database
+    add_chunks_to_db(chunks, doc_id, folder_name=folder_name, file_path=file_path)
 
     end_time = time.time()
     logging.info(f"Finished indexing {doc_id} in {round(end_time - start_time, 2)} seconds")
     return True
 
-
-
-def index_pdf(pdf_path, category="Uncategorized", progress_callback=None):
+def index_pdf(file_path, folder_name=None):
     """
-    Index a PDF document and store it in the vector database.
-    Uses the optimized pipeline (text or OCR) with caching, batching, and persistence.
+    Main entry point for indexing a PDF file.
     """
-    doc_id = os.path.splitext(os.path.basename(pdf_path))[0]
-    
-    if progress_callback:
-        progress_callback(f"Starting indexing for {doc_id}")
-    
+    doc_id = os.path.splitext(os.path.basename(file_path))[0]
     logging.info(f"Starting indexing for {doc_id}")
 
     try:
-        start = time.time()
-        success = build_knowledge_base_optimized(pdf_path, doc_id, category)
-
+        success = build_knowledge_base_optimized(file_path, doc_id, folder_name)
         if success:
-            end = time.time()
-            logging.info(f"Indexing completed for {doc_id} in {end - start:.2f} sec")
-            if progress_callback:
-                progress_callback(f"Finished indexing {doc_id} in {end - start:.2f} sec")
+            logging.info(f"Indexing completed for {doc_id}")
             return doc_id
         else:
             logging.error(f"Failed to index {doc_id}")
-            if progress_callback:
-                progress_callback(f"Failed to index {doc_id}")
             return None
     except Exception as e:
         logging.error(f"Failed to index {doc_id}: {str(e)}")
-        if progress_callback:
-            progress_callback(f"Error indexing PDF: {str(e)}")
         return None

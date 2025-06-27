@@ -392,16 +392,24 @@
             }
         }
 
-        // Display search results
+       
+        
         function displayResults(results) {
+            const query = searchInput.value.trim();
             resultsList.innerHTML = '';
+
+            // Escape regex special characters in the query
+            const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const highlightRegex = new RegExp(escapedQuery, 'gi');
 
             results.forEach(result => {
                 const resultCard = document.createElement('div');
                 resultCard.className = 'card result-card';
 
-                // Use similarity score directly (already in percentage)
                 const relevancePercent = result.similarity;
+
+                // Highlight query terms in result text
+                const highlightedText = result.text.replace(highlightRegex, match => `<mark>${match}</mark>`);
 
                 resultCard.innerHTML = `
                     <div class="result-header">
@@ -413,7 +421,7 @@
                         </div>
                     </div>
                     <div class="result-body">
-                        <div class="result-text">${result.text}</div>
+                        <div class="result-text">${highlightedText}</div>
                         <div class="result-meta">
                             <div>
                                 <i class="fas fa-file-alt me-1"></i>Document: ${result.document}
@@ -427,7 +435,9 @@
 
                 resultsList.appendChild(resultCard);
             });
-        }
+}
+
+        
 
         // Get suggestions from the server
         async function getSuggestions(query) {
