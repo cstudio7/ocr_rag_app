@@ -199,4 +199,5 @@ desktop/dist/
 desktop/build/
 desktop/KnowledgeNet.spec
 
-data
+data/
+
