@@ -356,7 +356,7 @@
                             <button class="btn-user-action btn-toggle-status" data-user-id="${user.id}" title="${user.is_active ? 'Deactivate' : 'Activate'} user">
                                 <i class="fas fa-${user.is_active ? 'user-slash' : 'user-check'}"></i>
                             </button>
-                            ${user.username !== 'shabreen' ? `
+                            ${user.id !== {{ current_user.id }} ? `
                                 <button class="btn-user-action btn-delete-user" data-user-id="${user.id}" title="Delete user">
                                     <i class="fas fa-trash"></i>
                                 </button>
