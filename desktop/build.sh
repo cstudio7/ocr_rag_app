@@ -1,4 +1,6 @@
 #!/bin/bash
+# Build the KnowledgeNet desktop app with PyInstaller. Run from the desktop/ folder.
+cd "$(dirname "$0")"
 
 # Define variables
 APP_NAME="KnowledgeNet"
@@ -7,10 +9,10 @@ DMG_NAME="${APP_NAME}.dmg"
 EXE_NAME="${APP_NAME}.exe"
 VOL_NAME="${APP_NAME} Installer"
 MAIN_FILE="main.py"
-BACKEND_PATH="../KnowledgeNet"
+BACKEND_PATH="../backend"
 INSTALLER_SRC="_installer"
 VENV_DIR="venv"
-REQUIREMENTS_FILE="requirements.txt"
+REQUIREMENTS_FILE="../requirements-desktop.txt"
 OS_TYPE=$(uname -s)
 
 # Check if requirements.txt exists
@@ -57,7 +59,8 @@ if [ "$OS_TYPE" = "Darwin" ]; then
   pyinstaller \
     --name "$APP_NAME" \
     --windowed \
-    --add-data "$BACKEND_PATH:KnowledgeNet" \
+    --add-data "$BACKEND_PATH:backend" \
+    --add-data "assets:assets" \
     "$MAIN_FILE"
 
   # Check if dist folder was created
@@ -106,7 +109,8 @@ elif [ "$OS_TYPE" = "Linux" ] || [ "$OS_TYPE" = "CYGWIN_NT-*" ] || [ "$OS_TYPE" 
   pyinstaller \
     --name "$APP_NAME" \
     --windowed \
-    --add-data "$BACKEND_PATH;app" \
+    --add-data "$BACKEND_PATH;backend" \
+    --add-data "assets;assets" \
     --icon "app-icon.ico" \
     "$MAIN_FILE"
 

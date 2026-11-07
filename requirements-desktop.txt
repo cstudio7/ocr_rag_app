@@ -1,0 +1,5 @@
+# Desktop wrapper (Qt window + PyInstaller packaging)
+-r requirements.txt
+PyQt5>=5.15.4
+PyQtWebEngine>=5.15.4
+pyinstaller
