@@ -238,6 +238,9 @@
         <h3 class="mb-3">Search Results</h3>
         <div id="resultsList"></div>
     </div>
+    <nav id="paginationNav" class="d-none mt-4" aria-label="Search results pagination">
+  <ul class="pagination justify-content-center"></ul>
+</nav>
 
     <!-- No Results -->
     <div id="noResults" class="no-results d-none">
@@ -261,12 +264,18 @@
         const correctionText = document.getElementById('correctionText');
         const searchOriginalBtn = document.getElementById('searchOriginal');
         const suggestionsDropdown = document.getElementById('suggestionsDropdown');
+        const paginationNav = document.getElementById('paginationNav');
+        const paginationList = paginationNav.querySelector('.pagination');
 
         let originalQuery = '';
         let correctedQuery = '';
         let currentSuggestionIndex = -1;
         let suggestions = [];
         let suggestionTimeout = null;
+        let currentPage = 1;
+        let isCorrectionUsed = false;
+        let totalResults = 0;
+        let perPage = 10;
 
         // Handle search
         searchButton.addEventListener('click', performSearch);
@@ -330,60 +339,53 @@
             }
         });
 
-        // Perform search
-        async function performSearch(useOriginal = false) {
+        // 
+        async function performSearch(useOriginal = false, page = 1) {
             const query = searchInput.value.trim();
-
             if (!query) return;
 
-            // Show loading, hide results and spell correction notice
             loadingIndicator.classList.remove('d-none');
             resultsContainer.classList.add('d-none');
             noResults.classList.add('d-none');
             spellCorrectionNotice.classList.add('d-none');
+            paginationNav.classList.add('d-none');
             hideSuggestions();
 
             try {
-                const requestBody = { query };
-                if (useOriginal) {
-                    requestBody.use_original = true;
-                }
+                const requestBody = { query, page, per_page: perPage };
+                if (useOriginal) requestBody.use_original = true;
 
                 const response = await fetch('/api/query', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(requestBody)
                 });
 
-                if (!response.ok) {
-                    throw new Error('Search failed');
-                }
-
                 const data = await response.json();
-
-                // Hide loading
                 loadingIndicator.classList.add('d-none');
 
-                // Handle spell correction
+                // if (data.has_corrections && !useOriginal) {
+                //     correctionText.innerHTML = data.corrections.map(c => `"${c.original}" → "${c.corrected}"`).join(', ');
+                //     spellCorrectionNotice.classList.remove('d-none');
+                // }
                 if (data.has_corrections && !useOriginal) {
-                    originalQuery = data.query;
-                    correctedQuery = data.corrected_query;
-
-                    // Show spell correction notice
-                    const corrections = data.corrections.map(c => `"${c.original}" → "${c.corrected}"`).join(', ');
-                    correctionText.innerHTML = `${corrections}`;
+                    isCorrectionUsed = true;
+                    correctionText.innerHTML = data.corrections.map(c => `"${c.original}" → "${c.corrected}"`).join(', ');
                     spellCorrectionNotice.classList.remove('d-none');
-                }
+                } else {
+                 isCorrectionUsed = false;
+            }
+
+
+                totalResults = data.total_results || 0;
+                currentPage = data.page || 1;
 
                 if (!data.results || data.results.length === 0) {
-                    // Show no results
                     noResults.classList.remove('d-none');
                 } else {
-                    // Show results
                     displayResults(data.results);
                     resultsContainer.classList.remove('d-none');
+                    renderPagination();
                 }
             } catch (error) {
                 console.error('Search error:', error);
@@ -392,16 +394,52 @@
             }
         }
 
-        // Display search results
+        function renderPagination() {
+            const totalPages = Math.ceil(totalResults / perPage);
+            if (totalPages <= 1) return;
+
+            paginationList.innerHTML = '';
+            paginationNav.classList.remove('d-none');
+
+            for (let i = 1; i <= totalPages; i++) {
+                const li = document.createElement('li');
+                li.className = `page-item ${i === currentPage ? 'active' : ''}`;
+                li.innerHTML = `<a class="page-link" href="#">${i}</a>`;
+                li.addEventListener('click', function(e) {
+                 e.preventDefault();
+                performSearch(!isCorrectionUsed, i);  // if corrected, we send corrected query again
+        });
+
+                paginationList.appendChild(li);
+            }
+        }
+
+        // update button & enter key handlers
+        searchButton.addEventListener('click', () => performSearch());
+        searchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') performSearch();
+        });
+        searchOriginalBtn.addEventListener('click', () => performSearch(true));
+
+
+       
+        
         function displayResults(results) {
+            const query = searchInput.value.trim();
             resultsList.innerHTML = '';
+
+            // Escape regex special characters in the query
+            const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const highlightRegex = new RegExp(escapedQuery, 'gi');
 
             results.forEach(result => {
                 const resultCard = document.createElement('div');
                 resultCard.className = 'card result-card';
 
-                // Use similarity score directly (already in percentage)
                 const relevancePercent = result.similarity;
+
+                // Highlight query terms in result text
+                const highlightedText = result.text.replace(highlightRegex, match => `<mark>${match}</mark>`);
 
                 resultCard.innerHTML = `
                     <div class="result-header">
@@ -413,7 +451,7 @@
                         </div>
                     </div>
                     <div class="result-body">
-                        <div class="result-text">${result.text}</div>
+                        <div class="result-text">${highlightedText}</div>
                         <div class="result-meta">
                             <div>
                                 <i class="fas fa-file-alt me-1"></i>Document: ${result.document}
@@ -427,7 +465,9 @@
 
                 resultsList.appendChild(resultCard);
             });
-        }
+}
+
+        
 
         // Get suggestions from the server
         async function getSuggestions(query) {
