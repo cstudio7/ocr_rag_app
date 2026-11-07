@@ -1,0 +1,22 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      # Heavy ML/OCR packages are stubbed in tests/conftest.py, so only the
+      # lightweight dependencies are installed here.
+      - name: Install dependencies
+        run: |
+          pip install flask flask-login flask-wtf flask-sqlalchemy email-validator \
+            python-dotenv pyspellchecker PyPDF2 tqdm psutil pytest
+      - name: Run tests
+        run: pytest -q
